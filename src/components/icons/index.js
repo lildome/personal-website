@@ -1,0 +1,8 @@
+export { default as LambdaIcon } from './LambdaIcon'
+export { default as DatabaseIcon } from './DatabaseIcon'
+export { default as QueueIcon } from './QueueIcon'
+export { default as ApiIcon } from './ApiIcon'
+export { default as FrontendIcon } from './FrontendIcon'
+export { default as StorageIcon } from './StorageIcon'
+export { default as PipeIcon } from './PipeIcon'
+export { default as DeployIcon } from './DeployIcon'

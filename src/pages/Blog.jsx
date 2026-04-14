@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import projectData from '../data/projects.json'
+import ArchitectureDiagram from '../components/ArchitectureDiagram'
 import './Blog.css'
 
 const project = projectData.projects[0]
@@ -98,64 +99,7 @@ function Blog() {
 
             {expanded && (
               <div className="flowchart__content">
-                <div className="flow">
-                  <div className="flow-node flow-node--surface">Frontend dashboard<br /><span className="flow-node__sub">S3 + CloudFront</span></div>
-                  <span className="flow-arrow">↓</span>
-                  <div className="flow-node flow-node--surface">API Gateway</div>
-                  <span className="flow-arrow">↓</span>
-                  <div className="flow-node flow-node--lambda">job-scraper<br /><span className="flow-node__sub">Lambda + Apify</span></div>
-                  <span className="flow-arrow">↓</span>
-                  <div className="flow-node flow-node--dynamo">DynamoDB jobs table<br /><span className="flow-node__sub">INSERT</span></div>
-                  <span className="flow-arrow">↓</span>
-                  <div className="flow-node flow-node--surface">DynamoDB Stream → EventBridge → SQS</div>
-                  <span className="flow-arrow">↓</span>
-                  <div className="flow-node flow-node--lambda">job-processor<br /><span className="flow-node__sub">SQS consumer, MaxConcurrency=2</span></div>
-                  <span className="flow-arrow">↓</span>
-                  <div className="flow-node flow-node--lambda">job-summariser<br /><span className="flow-node__sub">Lambda + Claude</span></div>
-                  <span className="flow-arrow">↓</span>
-
-                  <div className="flow-split">
-                    <div className="flow-split__col">
-                      <div className="flow-node flow-node--lambda">company-researcher<br /><span className="flow-node__sub">Lambda + Claude</span></div>
-                      <span className="flow-arrow">↓</span>
-                      <div className="flow-node flow-node--dynamo">DynamoDB companies table</div>
-                    </div>
-                    <div className="flow-split__col">
-                      <div className="flow-node flow-node--lambda">cv-matcher<br /><span className="flow-node__sub">Lambda + Claude</span></div>
-                      <span className="flow-arrow">↓</span>
-                      <div className="flow-node flow-node--dynamo">DynamoDB jobs table<br /><span className="flow-node__sub">match_score</span></div>
-                    </div>
-                  </div>
-
-                  <div className="flow-label">On-demand</div>
-                  <div className="flow-split">
-                    <div className="flow-split__col">
-                      <div className="flow-node flow-node--lambda">resume-tailor<br /><span className="flow-node__sub">Lambda + Claude</span></div>
-                    </div>
-                    <div className="flow-split__col">
-                      <div className="flow-node flow-node--lambda">cover-letter-generator<br /><span className="flow-node__sub">Lambda + Claude</span></div>
-                    </div>
-                  </div>
-
-                  <span className="flow-arrow">↓</span>
-                  <div className="flow-node flow-node--dynamo">candidate_profiles<br /><span className="flow-node__sub">DynamoDB</span></div>
-                </div>
-
-                <div className="flow-deploy">
-                  <div className="flow-deploy__label">Deploy pipeline</div>
-                  <div className="flow-deploy__row">
-                    <div className="flow-node flow-node--surface">GitHub Actions</div>
-                    <span className="flow-arrow flow-arrow--h">→</span>
-                    <div className="flow-node flow-node--surface">path detection</div>
-                    <span className="flow-arrow flow-arrow--h">→</span>
-                    <div className="flow-node flow-node--surface">Docker build</div>
-                    <span className="flow-arrow flow-arrow--h">→</span>
-                    <div className="flow-node flow-node--surface">ECR</div>
-                    <span className="flow-arrow flow-arrow--h">→</span>
-                    <div className="flow-node flow-node--surface">update-function-code</div>
-                    <span className="flow-badge">OIDC auth</span>
-                  </div>
-                </div>
+                <ArchitectureDiagram layout="vertical" />
               </div>
             )}
           </div>
