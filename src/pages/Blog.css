@@ -1,0 +1,482 @@
+/* ── Shared section layout ───────────────────────────────────── */
+
+.blog-section {
+  padding: 4rem 1.5rem;
+}
+
+.blog-section--subtle {
+  background-color: var(--color-bg-subtle);
+}
+
+.blog-section__inner {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.blog-section__inner--centred {
+  text-align: center;
+}
+
+.blog-section__inner--narrow {
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+.blog-section__heading {
+  font-size: 1.4rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  margin-bottom: 1rem;
+}
+
+.blog-section__sub {
+  color: var(--color-text-secondary);
+  margin-bottom: 2rem;
+}
+
+.blog-section__para {
+  color: var(--color-text-secondary);
+  margin-bottom: 1rem;
+  line-height: 1.7;
+}
+
+.blog-section__para:last-child {
+  margin-bottom: 0;
+}
+
+/* ── Section 1 — Hook ────────────────────────────────────────── */
+
+.blog-hook {
+  background-color: var(--color-bg-subtle);
+  padding: 5rem 1.5rem;
+}
+
+.blog-hook__inner {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.blog-hook__title {
+  font-size: 2.25rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  margin-bottom: 1rem;
+}
+
+.blog-hook__intro {
+  font-size: 1rem;
+  color: var(--color-text-secondary);
+  line-height: 1.7;
+  max-width: 640px;
+  margin-bottom: 2.5rem;
+}
+
+.blog-hook__stats {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.stat-card {
+  background-color: var(--color-bg-surface);
+  border: 0.5px solid var(--color-border);
+  border-radius: 12px;
+  padding: 1rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 120px;
+}
+
+.stat-card__value {
+  font-size: 1.75rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  line-height: 1;
+}
+
+.stat-card__label {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+/* ── Section 2 — Problem ─────────────────────────────────────── */
+
+.problem-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3rem;
+  align-items: start;
+}
+
+.problem-grid__subheading {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  margin-bottom: 1rem;
+}
+
+.problem-grid__left p {
+  color: var(--color-text-secondary);
+  line-height: 1.7;
+}
+
+.problem-checklist {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.problem-checklist li {
+  font-size: 0.95rem;
+  color: var(--color-text-muted);
+  text-decoration: line-through;
+  padding-left: 1.5rem;
+  position: relative;
+}
+
+.problem-checklist li::before {
+  content: '✗';
+  position: absolute;
+  left: 0;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  display: inline-block;
+}
+
+@media (max-width: 768px) {
+  .problem-grid {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+}
+
+/* ── Section 3 — Pipeline ────────────────────────────────────── */
+
+.pipeline {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.pipeline-card {
+  flex: 1;
+  min-width: 130px;
+  max-width: 180px;
+  background-color: var(--color-bg-surface);
+  border: 0.5px solid var(--color-border);
+  border-top: 3px solid var(--color-accent);
+  border-radius: 8px;
+  padding: 1rem;
+  text-align: left;
+}
+
+.pipeline-card__name {
+  display: block;
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: var(--color-text-primary);
+  margin-bottom: 0.35rem;
+}
+
+.pipeline-card__desc {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.pipeline-arrow {
+  align-self: center;
+  color: var(--color-accent);
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  padding: 0 0.1rem;
+}
+
+@media (max-width: 600px) {
+  .pipeline {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .pipeline-card {
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .pipeline-arrow {
+    transform: rotate(90deg);
+  }
+}
+
+/* ── Section 4 — Architecture: Flowchart ────────────────────── */
+
+.flowchart {
+  border: 0.5px solid var(--color-border);
+  border-radius: 8px;
+  margin-bottom: 2.5rem;
+  overflow: hidden;
+}
+
+.flowchart__toggle {
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-left: 3px solid var(--color-accent);
+  background-color: var(--color-bg-surface);
+  text-align: left;
+  gap: 1rem;
+}
+
+.flowchart__toggle:hover {
+  background-color: var(--color-bg-subtle);
+}
+
+.flowchart__toggle-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.flowchart__toggle-title {
+  font-weight: 500;
+  font-size: 0.95rem;
+  color: var(--color-text-primary);
+}
+
+.flowchart__toggle-sub {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.flowchart__chevron {
+  font-size: 1.4rem;
+  color: var(--color-text-muted);
+  display: inline-block;
+  transition: transform 0.2s ease;
+  line-height: 1;
+}
+
+.flowchart__chevron--open {
+  transform: rotate(90deg);
+}
+
+.flowchart__content {
+  padding: 1.5rem;
+  background-color: var(--color-bg-surface);
+  border-top: 0.5px solid var(--color-border);
+}
+
+.flow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.flow-node {
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
+  border: 0.5px solid var(--color-border);
+  font-size: 0.825rem;
+  text-align: center;
+  min-width: 220px;
+  max-width: 320px;
+  line-height: 1.4;
+  color: var(--color-text-primary);
+}
+
+.flow-node--surface {
+  background-color: var(--color-bg-surface);
+}
+
+.flow-node--lambda {
+  background-color: var(--color-bg-surface);
+  border-top: 3px solid var(--color-accent);
+}
+
+.flow-node--dynamo {
+  background-color: var(--color-bg-subtle);
+}
+
+.flow-node__sub {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin-top: 0.15rem;
+}
+
+.flow-arrow {
+  color: var(--color-accent);
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.flow-arrow--h {
+  align-self: center;
+}
+
+.flow-split {
+  display: flex;
+  gap: 1.5rem;
+  justify-content: center;
+  width: 100%;
+}
+
+.flow-split__col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.flow-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-top: 0.5rem;
+}
+
+.flow-deploy {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 0.5px solid var(--color-border);
+}
+
+.flow-deploy__label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.75rem;
+}
+
+.flow-deploy__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.flow-deploy__row .flow-node {
+  min-width: unset;
+  max-width: unset;
+  flex-shrink: 0;
+}
+
+.flow-badge {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background-color: var(--color-bg-subtle);
+  color: var(--color-accent);
+  border: 0.5px solid var(--color-accent);
+  margin-left: 0.25rem;
+}
+
+/* ── Section 4 — Architecture: Decision Cards ───────────────── */
+
+.decisions-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.decision-card {
+  border-left: 3px solid var(--color-accent);
+  border-radius: 8px;
+  background-color: var(--color-bg-surface);
+  border: 0.5px solid var(--color-border);
+  border-left: 3px solid var(--color-accent);
+  overflow: hidden;
+}
+
+.decision-card__half {
+  padding: 1rem 1.25rem;
+}
+
+.decision-card__divider {
+  border-top: 0.5px solid var(--color-border);
+}
+
+.decision-card__label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  margin-bottom: 0.4rem;
+}
+
+.decision-card__label--problem {
+  color: var(--color-text-muted);
+}
+
+.decision-card__label--solution {
+  color: var(--color-accent);
+}
+
+.decision-card__text {
+  font-size: 0.875rem;
+  color: var(--color-text-primary);
+  line-height: 1.6;
+}
+
+@media (max-width: 768px) {
+  .decisions-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Section 5 — Tech Stack ──────────────────────────────────── */
+
+.stack-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-top: 1rem;
+}
+
+.stack-badge {
+  font-size: 0.85rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: 8px;
+  background-color: var(--color-bg-surface);
+  color: var(--color-text-primary);
+  border: 0.5px solid var(--color-border);
+}
+
+/* ── Section 7 — What's Next ─────────────────────────────────── */
+
+.next-steps {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.next-steps li {
+  color: var(--color-text-secondary);
+  padding-left: 1.25rem;
+  position: relative;
+  line-height: 1.6;
+}
+
+.next-steps li::before {
+  content: '•';
+  position: absolute;
+  left: 0;
+  color: var(--color-accent);
+}

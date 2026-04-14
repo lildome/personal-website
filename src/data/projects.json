@@ -1,0 +1,67 @@
+{
+  "projects": [
+    {
+      "id": "job-hunt-agents",
+      "title": "[PLACEHOLDER: Project Title]",
+      "tagline": "[PLACEHOLDER: One-line project tagline]",
+      "status": "Active",
+      "stats": {
+        "lambdas": 8,
+        "awsServices": 7
+      },
+      "stack": [
+        "Python",
+        "AWS Lambda",
+        "DynamoDB",
+        "SQS",
+        "EventBridge",
+        "API Gateway",
+        "CloudFront",
+        "S3",
+        "Docker",
+        "ECR",
+        "GitHub Actions",
+        "Anthropic API",
+        "Claude Sonnet",
+        "Apify",
+        "React",
+        "Vite"
+      ],
+      "pipeline": [
+        { "name": "Scrape", "description": "[PLACEHOLDER: one-line description of the scrape step]" },
+        { "name": "Summarise", "description": "[PLACEHOLDER: one-line description of the summarise step]" },
+        { "name": "Research", "description": "[PLACEHOLDER: one-line description of the research step]" },
+        { "name": "Match", "description": "[PLACEHOLDER: one-line description of the match step]" },
+        { "name": "Tailor", "description": "[PLACEHOLDER: one-line description of the tailor step]" }
+      ],
+      "decisions": [
+        {
+          "problem": "[PLACEHOLDER: concurrent Lambda executions exhausted the Anthropic rate limit]",
+          "solution": "[PLACEHOLDER: SQS queue with MaxConcurrency=2 caps parallel processing]"
+        },
+        {
+          "problem": "[PLACEHOLDER: AI frameworks like LangChain abstract away the fundamentals]",
+          "solution": "[PLACEHOLDER: built every agent from scratch to understand what's actually happening]"
+        },
+        {
+          "problem": "[PLACEHOLDER: company research blocking the main pipeline added unnecessary latency]",
+          "solution": "[PLACEHOLDER: DynamoDB stream trigger runs company-researcher in parallel, decoupled from the main flow]"
+        },
+        {
+          "problem": "[PLACEHOLDER: SSM SecureString parameters silently fail without KMS permissions]",
+          "solution": "[PLACEHOLDER: explicit kms:Decrypt added to Lambda execution role alongside ssm:GetParameter]"
+        }
+      ],
+      "learnings": [
+        "[PLACEHOLDER: learning paragraph 1 — conversational, honest, first person]",
+        "[PLACEHOLDER: learning paragraph 2 — conversational, honest, first person]",
+        "[PLACEHOLDER: learning paragraph 3 — conversational, honest, first person]"
+      ],
+      "nextSteps": [
+        "[PLACEHOLDER: LinkedIn scraping via Apify]",
+        "[PLACEHOLDER: onboarding agent for user config]",
+        "[PLACEHOLDER: multi-user support]"
+      ]
+    }
+  ]
+}

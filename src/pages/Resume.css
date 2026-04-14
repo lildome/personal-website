@@ -1,0 +1,173 @@
+.resume {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 3rem 1.5rem;
+}
+
+.resume__header {
+  margin-bottom: 2.5rem;
+}
+
+.resume__name {
+  font-size: 2rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  margin-bottom: 0.25rem;
+}
+
+.resume__title {
+  font-size: 1rem;
+  color: var(--color-text-secondary);
+  margin-bottom: 0.75rem;
+}
+
+.resume__contact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+.resume__section {
+  border-top: 0.5px solid var(--color-border);
+  padding-top: 2rem;
+  margin-top: 2rem;
+}
+
+.resume__section-heading {
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-bottom: 1.25rem;
+}
+
+.resume__job {
+  margin-bottom: 1.75rem;
+}
+
+.resume__job:last-child {
+  margin-bottom: 0;
+}
+
+.resume__job-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.5rem;
+  gap: 1rem;
+}
+
+.resume__job-company {
+  font-weight: 500;
+  color: var(--color-text-primary);
+  display: block;
+}
+
+.resume__job-role {
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  display: block;
+}
+
+.resume__job-period {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.resume__bullets {
+  list-style: none;
+  padding-left: 0;
+}
+
+.resume__bullets li {
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  padding-left: 1rem;
+  position: relative;
+  margin-bottom: 0.35rem;
+}
+
+.resume__bullets li::before {
+  content: '–';
+  position: absolute;
+  left: 0;
+  color: var(--color-text-muted);
+}
+
+.resume__skills {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.resume__skill-category {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.resume__skill-label {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  min-width: 180px;
+  flex-shrink: 0;
+}
+
+.resume__skill-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.resume__skill-pill {
+  font-size: 0.8rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 8px;
+  background-color: var(--color-bg-subtle);
+  color: var(--color-text-secondary);
+  border: 0.5px solid var(--color-border);
+}
+
+.resume__education {
+  margin-bottom: 1rem;
+}
+
+.resume__education-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.2rem;
+}
+
+.resume__education-institution {
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.resume__education-year {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+.resume__education-degree {
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+}
+
+@media (max-width: 600px) {
+  .resume__skill-category {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .resume__skill-label {
+    min-width: unset;
+  }
+}

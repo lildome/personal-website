@@ -1,0 +1,53 @@
+{
+  "name": "[PLACEHOLDER: Full Name]",
+  "title": "[PLACEHOLDER: Job Title]",
+  "location": "[PLACEHOLDER: City, Country]",
+  "phone": "[PLACEHOLDER: Phone Number]",
+  "email": "[PLACEHOLDER: Email Address]",
+  "linkedin": "[PLACEHOLDER: LinkedIn URL]",
+  "summary": "[PLACEHOLDER: Professional summary — 2-3 sentences describing your background, what you do, and what you're looking for]",
+  "experience": [
+    {
+      "company": "[PLACEHOLDER: Company Name]",
+      "role": "[PLACEHOLDER: Role Title]",
+      "period": "[PLACEHOLDER: Month Year – Month Year]",
+      "bullets": [
+        "[PLACEHOLDER: Key achievement or responsibility — quantify where possible]",
+        "[PLACEHOLDER: Key achievement or responsibility — quantify where possible]",
+        "[PLACEHOLDER: Key achievement or responsibility — quantify where possible]"
+      ]
+    },
+    {
+      "company": "[PLACEHOLDER: Company Name]",
+      "role": "[PLACEHOLDER: Role Title]",
+      "period": "[PLACEHOLDER: Month Year – Month Year]",
+      "bullets": [
+        "[PLACEHOLDER: Key achievement or responsibility]",
+        "[PLACEHOLDER: Key achievement or responsibility]"
+      ]
+    }
+  ],
+  "skills": {
+    "categories": [
+      {
+        "label": "[PLACEHOLDER: Category — e.g. Languages]",
+        "items": ["[PLACEHOLDER: Skill]", "[PLACEHOLDER: Skill]", "[PLACEHOLDER: Skill]"]
+      },
+      {
+        "label": "[PLACEHOLDER: Category — e.g. Cloud & Infrastructure]",
+        "items": ["[PLACEHOLDER: Skill]", "[PLACEHOLDER: Skill]", "[PLACEHOLDER: Skill]"]
+      },
+      {
+        "label": "[PLACEHOLDER: Category — e.g. Tools & Frameworks]",
+        "items": ["[PLACEHOLDER: Skill]", "[PLACEHOLDER: Skill]", "[PLACEHOLDER: Skill]"]
+      }
+    ]
+  },
+  "education": [
+    {
+      "institution": "[PLACEHOLDER: University Name]",
+      "degree": "[PLACEHOLDER: Degree and Field of Study]",
+      "year": "[PLACEHOLDER: Graduation Year]"
+    }
+  ]
+}
