@@ -1,173 +1,141 @@
-/* ── Override Blog.css overflow so SVG overlay is not clipped ── */
-.flowchart {
-  overflow: visible;
-}
-
-/* ── Diagram root ─────────────────────────────────────────────── */
+/* ── Diagram wrapper ──────────────────────────────────────────── */
 
 .arch-diagram {
-  position: relative;
-  padding: 0.5rem;
+  width: 100%;
   font-family: inherit;
 }
 
-/* ── Horizontal layout ────────────────────────────────────────── */
+/* ── Desktop SVG ──────────────────────────────────────────────── */
 
-.arch-diagram--horizontal .arch-main-flow {
-  display: flex;
-  flex-direction: row;
-  gap: 20px;
-  align-items: flex-start;
-  flex-wrap: nowrap;
-}
-
-/* ── Vertical layout ──────────────────────────────────────────── */
-
-.arch-diagram--vertical {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-/* ── Support / side-by-side rows ─────────────────────────────── */
-
-.arch-support-row,
-.arch-side-by-side {
-  display: flex;
-  flex-direction: row;
-  gap: 20px;
-  flex-wrap: wrap;
-}
-
-.arch-support-row {
-  margin-top: 20px;
-}
-
-/* ── Branch row (parallel nodes within a group) ─────────────── */
-
-.arch-row {
-  display: flex;
-  flex-direction: row;
-  gap: 12px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-/* ── SVG overlay ──────────────────────────────────────────────── */
-
-.arch-svg-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
+.arch-svg {
+  display: block;
   width: 100%;
-  height: 100%;
-  pointer-events: none;
-  overflow: visible;
 }
 
-/* ── DiagramGroup ─────────────────────────────────────────────── */
+/* ── Mobile HTML layout ───────────────────────────────────────── */
 
-.arch-group {
-  position: relative;
-  border: 1px dashed var(--color-border);
-  border-radius: 12px;
-  padding: 20px 16px 16px;
+.arch-mobile {
+  display: none;
 }
 
-.arch-group__label {
-  position: absolute;
-  top: -8px;
-  left: 12px;
+@media (max-width: 768px) {
+  .arch-svg    { display: none; }
+  .arch-mobile { display: flex; flex-direction: column; align-items: center; }
+}
+
+/* Section labels */
+.arch-m-section-label {
+  align-self: flex-start;
   font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
+  font-weight: 600;
   letter-spacing: 0.07em;
+  text-transform: uppercase;
   color: var(--color-text-muted);
-  background: var(--color-bg-surface);
-  padding: 0 4px;
-  line-height: 1;
-  white-space: nowrap;
+  margin: 0 0 10px;
 }
 
-.arch-group__inner {
+.arch-m-section-label--sep {
+  margin-top: 20px;
+  padding-top: 18px;
+  width: 100%;
+  border-top: 1px dashed var(--color-border);
+}
+
+/* Node items */
+.arch-m-item {
   display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.arch-group__inner--column {
   flex-direction: column;
-  align-items: stretch;
-}
-
-.arch-group__inner--row {
-  flex-direction: row;
   align-items: center;
+  width: 100%;
+  max-width: 280px;
 }
 
-/* ── NodeCard ─────────────────────────────────────────────────── */
-
-.arch-node {
+.arch-m-node {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 6px;
   border: 0.5px solid var(--color-border);
-  border-radius: 8px;
-  padding: 10px 12px;
-  min-width: 100px;
-  text-align: center;
   background: var(--color-bg-surface);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
+  text-align: center;
 }
 
-.arch-node--lambda {
+.arch-m-node--lambda {
   border-top: 3px solid var(--color-accent);
 }
 
-.arch-node--dynamo {
+.arch-m-node--processor {
+  border: 2px solid var(--color-accent);
+}
+
+.arch-m-node--data {
   background: var(--color-bg-subtle);
+  border-color: var(--color-border);
 }
 
-.arch-node__name {
-  font-size: 0.78rem;
-  color: var(--color-text-primary);
+.arch-m-name {
+  display: block;
+  font-size: 12px;
   font-weight: 500;
+  color: var(--color-text-primary);
   line-height: 1.3;
-  word-break: break-word;
 }
 
-.arch-node__sublabel {
-  font-size: 0.7rem;
+.arch-m-sub {
+  display: block;
+  font-size: 11px;
   color: var(--color-text-muted);
-  line-height: 1.2;
+  margin-top: 2px;
 }
 
-/* ── Connection paths ─────────────────────────────────────────── */
-
-.arch-conn-path {
-  fill: none;
-  stroke-width: 1.5;
-  opacity: 0.55;
+/* Arrow connectors */
+.arch-m-arrow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 0;
 }
 
-.arch-conn-label {
-  font-size: 9px;
-  font-family: inherit;
-  letter-spacing: 0.02em;
+.arch-m-arrow__track {
+  display: block;
+  width: 1.5px;
+  height: 18px;
+  background: var(--color-accent);
+  position: relative;
 }
 
-/* ── Responsive ───────────────────────────────────────────────── */
+/* Arrowhead via pseudo-element at the bottom of the track */
+.arch-m-arrow__track::after {
+  content: '';
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 6px solid var(--color-accent);
+}
 
-@media (max-width: 768px) {
-  .arch-diagram--horizontal .arch-main-flow {
-    flex-direction: column;
-  }
+/* Dashed on-demand arrows */
+.arch-m-arrow--dashed {
+  opacity: 0.6;
+}
 
-  .arch-support-row {
-    flex-direction: column;
-  }
+.arch-m-arrow--dashed .arch-m-arrow__track {
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--color-accent) 0px,
+    var(--color-accent) 4px,
+    transparent 4px,
+    transparent 7px
+  );
+}
 
-  .arch-node {
-    min-width: 80px;
-  }
+.arch-m-arrow__label {
+  font-size: 10px;
+  color: var(--color-text-muted);
+  line-height: 1;
+  margin-top: 6px;
 }
