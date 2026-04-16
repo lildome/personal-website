@@ -24,7 +24,7 @@ function Resume() {
           <span>{location}</span>
           <span>{phone}</span>
           <span>{email}</span>
-          <span>{linkedin}</span>
+          <a href={`https://${linkedin}`} target="_blank" rel="noreferrer">{linkedin}</a>
         </div>
       </header>
 
