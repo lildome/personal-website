@@ -13,9 +13,9 @@ function Blog() {
       {/* Section 1 — Hook */}
       <section className="blog-hook">
         <div className="blog-hook__inner">
-          <h1 className="blog-hook__title">[PLACEHOLDER: hook heading — project name, punchy]</h1>
+          <h1 className="blog-hook__title">{project.hook.heading}</h1>
           <p className="blog-hook__intro">
-            [PLACEHOLDER: hook opening paragraph — informal, first person, sets the scene for why this project exists]
+            {project.hook.paragraph}
           </p>
           <div className="blog-hook__stats">
             <div className="stat-card">
@@ -39,16 +39,15 @@ function Blog() {
         <div className="blog-section__inner">
           <div className="problem-grid">
             <div className="problem-grid__left">
-              <h2 className="blog-section__heading">The problem</h2>
-              <p>[PLACEHOLDER: the problem paragraph — describe the manual, tedious job hunt process in first person]</p>
+              <h2 className="blog-section__heading">{project.problem.heading}</h2>
+              <p>{project.problem.paragraph}</p>
             </div>
             <div className="problem-grid__right">
               <h3 className="problem-grid__subheading">What I used to do manually</h3>
               <ul className="problem-checklist">
-                <li>Reading job descriptions</li>
-                <li>Researching companies</li>
-                <li>Tailoring CVs</li>
-                <li>Writing cover letters</li>
+                {project.problem.checklist.map((item, i) => (
+                  <li key={i}>{item}</li>
+                ))}
               </ul>
             </div>
           </div>
@@ -58,18 +57,18 @@ function Blog() {
       {/* Section 3 — Pipeline Overview */}
       <section className="blog-section blog-section--subtle">
         <div className="blog-section__inner blog-section__inner--centred">
-          <h2 className="blog-section__heading">Pipeline overview</h2>
+          <h2 className="blog-section__heading">{project.pipeline.heading}</h2>
           <p className="blog-section__sub">
-            [PLACEHOLDER: one sentence describing what the pipeline does end-to-end]
+            {project.pipeline.intro}
           </p>
           <div className="pipeline">
-            {project.pipeline.map((step, i) => (
+            {project.pipeline.steps.map((step, i) => (
               <React.Fragment key={step.name}>
                 <div className="pipeline-card">
                   <strong className="pipeline-card__name">{step.name}</strong>
                   <p className="pipeline-card__desc">{step.description}</p>
                 </div>
-                {i < project.pipeline.length - 1 && (
+                {i < project.pipeline.steps.length - 1 && (
                   <span className="pipeline-arrow" aria-hidden="true">→</span>
                 )}
               </React.Fragment>
@@ -78,8 +77,18 @@ function Blog() {
         </div>
       </section>
 
-      {/* Section 4 — Architecture */}
+      {/* Section 4 — How it came together */}
       <section className="blog-section">
+        <div className="blog-section__inner blog-section__inner--narrow">
+          <h2 className="blog-section__heading">{project.evolution.heading}</h2>
+          {project.evolution.paragraphs.map((para, i) => (
+            <p key={i} className="blog-section__para">{para}</p>
+          ))}
+        </div>
+      </section>
+
+      {/* Section 5 — Architecture */}
+      <section className="blog-section blog-section--subtle">
         <div className="blog-section__inner">
           <h2 className="blog-section__heading">Architecture</h2>
 
@@ -123,10 +132,10 @@ function Blog() {
         </div>
       </section>
 
-      {/* Section 5 — Tech Stack */}
-      <section className="blog-section blog-section--subtle">
+      {/* Section 6 — Tech Stack */}
+      <section className="blog-section">
         <div className="blog-section__inner blog-section__inner--centred">
-          <h2 className="blog-section__heading">Tech stack</h2>
+          <h2 className="blog-section__heading">What it's built with</h2>
           <div className="stack-badges">
             {project.stack.map(item => (
               <span key={item} className="stack-badge">{item}</span>
@@ -135,23 +144,30 @@ function Blog() {
         </div>
       </section>
 
-      {/* Section 6 — What I Learned */}
-      <section className="blog-section">
+      {/* Section 7 — What I Learned */}
+      <section className="blog-section blog-section--subtle">
         <div className="blog-section__inner blog-section__inner--narrow">
           <h2 className="blog-section__heading">What I learned</h2>
           {project.learnings.map((l, i) => (
-            <p key={i} className="blog-section__para">{l}</p>
+            l.includes('\n\n')
+              ? l.split('\n\n').map((para, j) => (
+                  <p key={`${i}-${j}`} className="blog-section__para">{para}</p>
+                ))
+              : <p key={i} className="blog-section__para">{l}</p>
           ))}
         </div>
       </section>
 
-      {/* Section 7 — What's Next */}
-      <section className="blog-section blog-section--subtle">
+      {/* Section 8 — What's Next */}
+      <section className="blog-section">
         <div className="blog-section__inner blog-section__inner--narrow">
-          <h2 className="blog-section__heading">What's next</h2>
+          <h2 className="blog-section__heading">{project.nextSteps.heading}</h2>
+          <p className="blog-section__para">{project.nextSteps.intro}</p>
           <ul className="next-steps">
-            {project.nextSteps.map((step, i) => (
-              <li key={i}>{step}</li>
+            {project.nextSteps.items.map((item, i) => (
+              <li key={i}>
+                <span style={{ fontWeight: 500 }}>{item.title}</span>{' '}{item.description}
+              </li>
             ))}
           </ul>
         </div>

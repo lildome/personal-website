@@ -61,7 +61,10 @@ function Resume() {
               <span className="resume__skill-label">{cat.label}</span>
               <div className="resume__skill-items">
                 {cat.items.map((item, j) => (
-                  <span key={j} className="resume__skill-pill">{item}</span>
+                  <span key={j} className="resume__skill-pill-wrapper">
+                    <span className="resume__skill-pill">{item.name} ({item.proficiency})</span>
+                    <span className="resume__skill-tooltip">{item.description}</span>
+                  </span>
                 ))}
               </div>
             </div>

@@ -2,66 +2,87 @@
   "projects": [
     {
       "id": "job-hunt-agents",
-      "title": "[PLACEHOLDER: Project Title]",
-      "tagline": "[PLACEHOLDER: One-line project tagline]",
+      "title": "I Automated My Job Hunt",
+      "tagline": "An end-to-end AI pipeline that automates the tedious parts of job hunting.",
       "status": "Active",
       "stats": {
         "lambdas": 8,
         "awsServices": 7
       },
-      "stack": [
-        "Python",
-        "AWS Lambda",
-        "DynamoDB",
-        "SQS",
-        "EventBridge",
-        "API Gateway",
-        "CloudFront",
-        "S3",
-        "Docker",
-        "ECR",
-        "GitHub Actions",
-        "Anthropic API",
-        "Claude Sonnet",
-        "Apify",
-        "React",
-        "Vite"
-      ],
-      "pipeline": [
-        { "name": "Scrape", "description": "[PLACEHOLDER: one-line description of the scrape step]" },
-        { "name": "Summarise", "description": "[PLACEHOLDER: one-line description of the summarise step]" },
-        { "name": "Research", "description": "[PLACEHOLDER: one-line description of the research step]" },
-        { "name": "Match", "description": "[PLACEHOLDER: one-line description of the match step]" },
-        { "name": "Tailor", "description": "[PLACEHOLDER: one-line description of the tailor step]" }
-      ],
+      "hook": {
+        "heading": "I Automated My Job Hunt",
+        "paragraph": "Job hunting is tedious in a way that's hard to explain until you're in it. Every application is roughly the same process: find a listing, read through it, research the company, figure out if it's worth your time, tailor your CV, write a cover letter. Repeated dozens of times with almost no feedback on whether any of it is working. At some point I stopped asking how to do it better and started asking how much of it I could just stop doing myself."
+      },
+      "problem": {
+        "heading": "The problem",
+        "paragraph": "The hardest part isn't any single application. It's the fact that each one demands the same level of care and attention as the last. Reading a job description properly takes time. Researching a company well takes time. Writing something that doesn't sound generic takes time. None of it is difficult exactly, but all of it together, repeated over and over, starts to feel like it's eating your life. And the worst part is that most of it is the same work, done slightly differently, every single time.",
+        "checklist": [
+          "Reading job descriptions",
+          "Researching companies",
+          "Tailoring CVs",
+          "Writing cover letters"
+        ]
+      },
+      "pipeline": {
+        "heading": "Pipeline overview",
+        "intro": "Here's what happens from the moment a search runs to a tailored application landing in the dashboard.",
+        "steps": [
+          { "name": "Scrape", "description": "Pulls listings from job boards and writes them to the database." },
+          { "name": "Summarise", "description": "Extracts structured requirements, experience and skills from the job description, each scored by how heavily they're emphasised." },
+          { "name": "Research", "description": "Searches the web for company information and scores culture fit against my preferences." },
+          { "name": "Match", "description": "Scores my CV against the job requirements, weighted by emphasis score." },
+          { "name": "Tailor", "description": "Rewrites my CV and generates a cover letter targeted to the role." }
+        ]
+      },
+      "evolution": {
+        "heading": "How it came together",
+        "paragraphs": [
+          "The pipeline didn't start the way it looks now. The original design used Step Functions to orchestrate the three main processing Lambdas in sequence, triggered directly by the DynamoDB stream when a new job landed. It was clean and it worked, so the natural next step was to see if I could get more out of it. Company research and job summarisation have no dependency on each other, so I broke company-researcher out of the Step Functions chain and gave it its own stream trigger to run in parallel. Architecturally it made sense. In practice it made the rate limit problem significantly worse. Now there were even more concurrent LLM calls with nothing coordinating them. That's when job-processor came in. A single SQS consumer that calls each Lambda sequentially, controlling the pace of everything downstream. One entry point, two jobs at a time, no more storms.",
+          "The interface took longer to figure out than the pipeline did. My first instinct was to just export the DynamoDB tables as CSVs: simple, functional, gets the data out. Honestly part of that was that frontend work wasn't something I was focused on improving with this project, and throwing together a decent UI felt like a distraction from what I actually wanted to learn. What changed that was Claude Code. Once I saw what it could put together from a clear spec, building a proper dashboard stopped feeling like a detour. I wrote out what I needed, handed it off, and a working frontend came back. It's not the part of the project I'm most proud of technically, but it's the part that made everything else actually useful."
+        ]
+      },
       "decisions": [
         {
-          "problem": "[PLACEHOLDER: concurrent Lambda executions exhausted the Anthropic rate limit]",
-          "solution": "[PLACEHOLDER: SQS queue with MaxConcurrency=2 caps parallel processing]"
+          "problem": "When multiple jobs came in at once, every pipeline execution fired simultaneously. The original design triggered company research in parallel from the DynamoDB stream, which seemed clean architecturally but made things worse. Now there were even more concurrent LLM calls with no coordination between them. Together they'd hit the Anthropic rate limit within seconds, and the SDK's built-in retry wasn't helping. It exhausted all attempts before the 60 second window had a chance to reset.",
+          "solution": "Introduced job-processor as a dedicated SQS consumer that calls each Lambda sequentially. It's the only function attached to the queue, so it controls the pace of everything downstream. The SQS trigger is capped at MaxConcurrency=2, meaning at most two jobs process at any one time regardless of how many come in together. Added a 65 second sleep on rate limit errors as a final backstop for the SDK's insufficient backoff."
         },
         {
-          "problem": "[PLACEHOLDER: AI frameworks like LangChain abstract away the fundamentals]",
-          "solution": "[PLACEHOLDER: built every agent from scratch to understand what's actually happening]"
+          "problem": "The original plan was to run plain Python Lambda functions with dependencies managed through Lambda layers. It worked for simple cases but fell apart quickly as the project grew. Conflicting package versions, architecture mismatches between local development and the Lambda runtime, and layers hitting size limits made the whole setup fragile. Every new dependency became a potential headache.",
+          "solution": "Switched to Docker containers for all Lambda functions. Dependency management becomes a standard Dockerfile problem, the local and production environments match exactly, and there are no size constraints to work around. The tradeoff is slower build times but for a project at this scale that's a non-issue."
         },
         {
-          "problem": "[PLACEHOLDER: company research blocking the main pipeline added unnecessary latency]",
-          "solution": "[PLACEHOLDER: DynamoDB stream trigger runs company-researcher in parallel, decoupled from the main flow]"
+          "problem": "The original design used a cheaper, lighter model for lower stakes tasks like summarisation and a stronger model for the heavy lifting. The cost saving made sense on paper but fell apart in practice. When LLMs are feeding their output into other LLMs, a weaker link doesn't just affect one step. It degrades everything downstream that depends on it.",
+          "solution": "Consolidated everything onto Claude Sonnet. The cost difference at single user scale turned out to be negligible, and the consistency across the whole pipeline made a noticeable difference to output quality. Keeping a single model also simplified debugging: when something goes wrong you're not wondering which model introduced the problem."
         },
         {
-          "problem": "[PLACEHOLDER: SSM SecureString parameters silently fail without KMS permissions]",
-          "solution": "[PLACEHOLDER: explicit kms:Decrypt added to Lambda execution role alongside ssm:GetParameter]"
+          "problem": "SSM Parameter Store has two parameter types: standard strings and SecureString. SecureString parameters are KMS encrypted, and the Lambda was failing silently when trying to read them. Standard SSM read permissions weren't enough.",
+          "solution": "Added explicit kms:Decrypt to the Lambda execution role alongside ssm:GetParameter. One permission, completely non-obvious, took longer to debug than it should have."
         }
       ],
-      "learnings": [
-        "[PLACEHOLDER: learning paragraph 1 — conversational, honest, first person]",
-        "[PLACEHOLDER: learning paragraph 2 — conversational, honest, first person]",
-        "[PLACEHOLDER: learning paragraph 3 — conversational, honest, first person]"
+      "stack": [
+        "Python", "AWS Lambda", "DynamoDB", "SQS", "EventBridge", "API Gateway",
+        "CloudFront", "S3", "Docker", "ECR", "GitHub Actions", "Anthropic API",
+        "Claude Sonnet", "Apify", "React", "Vite"
       ],
-      "nextSteps": [
-        "[PLACEHOLDER: LinkedIn scraping via Apify]",
-        "[PLACEHOLDER: onboarding agent for user config]",
-        "[PLACEHOLDER: multi-user support]"
-      ]
+      "learnings": [
+        "Everyone has spent a little time messing with LLMs since they came out, but this was the first project where I sat down and actually tried to build something real with them. What surprised me was how familiar it felt. Three sentences solving the problem, fifteen making sure your edge cases are covered, your input and output formats are enforced, and the whole thing won't fall apart at the first sign of adversity. To spell it out, it felt like programming. And programming is something I know. Structured output is probably where most of the work lives. LLMs don't produce it naturally, and getting them to do it reliably means telling them three times, building guardrails, and treating every edge case like it will definitely happen. Once I made that connection everything fell into place. There were tips and tricks to pick up along the way, but those are just language quirks, something every programmer is familiar with. So yeah, in the end LLMs have just reinvented COBOL. But it actually works.",
+        "My AWS experience going into this was surface level at best. Spinning up an EC2 instance when I was too lazy to run something locally, nothing that required services to actually talk to each other. Building something truly serverless for the first time was a different experience entirely. The learning curve wasn't in understanding what each service does, it was in understanding what happens when they interact in production. Rate limit windows, KMS permissions that fail silently, container manifests that Lambda rejects without telling you why. None of that is in any tutorial. It lives in the errors you hit when something that worked yesterday suddenly doesn't. What I didn't expect was how much the AWS ecosystem rewards that kind of digging. After a few years of sysadmin work where getting systems to talk to each other was a constant battle, having an ecosystem that's genuinely designed to integrate was a different experience. Once you understand the patterns, things just work together in a way that felt almost surprising.",
+        "I started this project calling it \"Job Hunt Agents,\" and while I'm leaving that title in place I've come away realising I haven't built anything I would define as an AI agent. When you first learn to program you're taught about encapsulation and modularity. Encapsulation: everything you build should keep its hands to itself, with controlled ways of passing information around. Modularity: everything should serve a clear purpose and be reusable wherever you need it. It's my opinion that these two ideas define 80% of good development practice at a structural level, and so that's what I built. A bunch of small prompts, each with a specific goal, structured inputs, and structured outputs so they could talk to each other in a way I could control. And somewhere along the way I realised that's not what an agent is.\n\nGetting into definitions in an emerging field is always messy, but in my mind an agent has a goal and maybe a little structure around how to achieve it, and then you let it do its thing. Find its own way to the answer. Now as a developer with control issues, I cannot just let my code go off and run itself. So I broke it into steps, integrated those steps with the LLM, kept easy breakpoints and a clear separation of concerns. It works. But it's not an agent. It's an LLM powered workflow. The LLMs aren't making decisions, they aren't given agency, and so they aren't agents.\n\nCould this have been done faster with a true agent? Probably. A single prompt along the lines of \"you're an expert recruiter, go find suitable jobs for this candidate\" and Claude figures out the rest. But then I lose control. It becomes a black box that eats tokens and eventually spits out an answer, with minimal insight into how it got there or how to replicate it. So in the end I'm glad I didn't build an agent. I don't think an agent would give me the control I need to make sure this project works tomorrow, and next week, and next year."
+      ],
+      "nextSteps": {
+        "heading": "What I'd build next",
+        "intro": "The project works well for what it is right now. These are the two things that would make it useful beyond just me.",
+        "items": [
+          {
+            "title": "Onboarding",
+            "description": "Right now setting up a new candidate profile means manually inserting a JSON document into DynamoDB. The fix is an onboarding flow that walks a new user through their preferences, experience, and CV. Whether that's a structured form or a conversational interface that builds the profile through discussion is something I'd want to test before deciding: both have merit and I'm genuinely not sure which produces better results."
+          },
+          {
+            "title": "Multi-user support",
+            "description": "The architecture is built around a single candidate profile and there's no payment layer to manage API costs across multiple users. Both are solvable problems, but solving them without a reason to felt like premature complexity. If this ever becomes something more than a personal tool that changes, but for now it does exactly what I need it to do."
+          }
+        ]
+      }
     }
   ]
 }
