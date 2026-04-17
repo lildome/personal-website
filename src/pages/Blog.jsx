@@ -19,14 +19,6 @@ function Blog() {
           </p>
           <div className="blog-hook__stats">
             <div className="stat-card">
-              <span className="stat-card__value">{project.stats.lambdas}</span>
-              <span className="stat-card__label">Lambda Functions</span>
-            </div>
-            <div className="stat-card">
-              <span className="stat-card__value">{project.stats.awsServices}</span>
-              <span className="stat-card__label">AWS Services</span>
-            </div>
-            <div className="stat-card">
               <span className="stat-card__value">{project.status}</span>
               <span className="stat-card__label">Status</span>
             </div>
