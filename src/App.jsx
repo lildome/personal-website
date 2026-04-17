@@ -4,6 +4,8 @@ import Nav from './components/Nav'
 import Landing from './pages/Landing'
 import Resume from './pages/Resume'
 import Blog from './pages/Blog'
+import Projects from './pages/Projects'
+import Dashboard from './pages/Dashboard'
 
 function App() {
   const [theme, setTheme] = useState(() => {
@@ -28,7 +30,9 @@ function App() {
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/resume" element={<Resume />} />
-          <Route path="/blog" element={<Blog />} />
+          <Route path="/projects" element={<Projects />} />
+          <Route path="/projects/job-hunt" element={<Blog />} />
+          <Route path="/projects/job-hunt/dashboard" element={<Dashboard />} />
         </Routes>
       </main>
     </div>

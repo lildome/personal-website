@@ -17,7 +17,7 @@ function Nav({ theme, onToggle }) {
             Resume
           </NavLink>
           <NavLink
-            to="/blog"
+            to="/projects"
             className={({ isActive }) => isActive ? 'nav-link nav-link--active' : 'nav-link'}
           >
             Projects

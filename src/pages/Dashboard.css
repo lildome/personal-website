@@ -1,0 +1,24 @@
+.dashboard {
+  padding: 4rem 1.5rem;
+}
+
+.dashboard__inner {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.dashboard-soon {
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 2rem;
+}
+
+.dashboard-soon__title {
+  font-size: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.dashboard-soon__body {
+  color: var(--color-text-secondary);
+}
