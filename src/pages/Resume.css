@@ -76,7 +76,20 @@
   font-size: 0.875rem;
   color: var(--color-text-muted);
   white-space: nowrap;
+}
+
+.resume__job-header-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
   flex-shrink: 0;
+  gap: 0.15rem;
+}
+
+.resume__project-link {
+  font-size: 0.875rem;
+  color: var(--color-accent);
+  white-space: nowrap;
 }
 
 .resume__bullets {

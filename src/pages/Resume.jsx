@@ -62,11 +62,18 @@ function Resume() {
             <div className="resume__job-header">
               <div>
                 <span className="resume__job-company">{project.title}</span>
-                <span className="resume__job-role">
-                  {project.subtitle} · <Link to={project.subtitleLink.to}>{project.subtitleLink.label}</Link>
-                </span>
+                <span className="resume__job-role">{project.subtitle}</span>
               </div>
-              <span className="resume__job-period">{project.date}</span>
+              <div className="resume__job-header-right">
+                <span className="resume__job-period">{project.date}</span>
+                <Link
+                  to={project.subtitleLink.to}
+                  className="resume__project-link"
+                  onClick={() => window.scrollTo(0, 0)}
+                >
+                  {project.subtitleLink.label}
+                </Link>
+              </div>
             </div>
             <ul className="resume__bullets">
               {project.bullets.map((bullet, j) => (
