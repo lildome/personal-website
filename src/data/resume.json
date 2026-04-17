@@ -48,6 +48,17 @@
       ]
     }
   ],
+  "projects": [
+    {
+      "title": "Job Hunt Agents",
+      "date": "2024 – Present",
+      "subtitle": "Personal project",
+      "subtitleLink": { "label": "Full writeup →", "to": "/blog" },
+      "bullets": [
+        "Built an AI pipeline on AWS that automates the full job-hunting workflow: scraping listings, summarising them, researching companies, matching against a candidate profile, and generating tailored resumes and cover letters. Eight Lambda functions, SQS orchestration, DynamoDB, and Claude Sonnet via the Anthropic API. Built the first half myself, used Claude Code for the remainder."
+      ]
+    }
+  ],
   "skills": {
     "categories": [
       {

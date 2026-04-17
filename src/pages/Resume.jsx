@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import resumeData from '../data/resume.json'
 import './Resume.css'
 
@@ -11,6 +12,7 @@ function Resume() {
     linkedin,
     summary,
     experience,
+    projects,
     skills,
     education,
   } = resumeData
@@ -46,6 +48,28 @@ function Resume() {
             </div>
             <ul className="resume__bullets">
               {job.bullets.map((bullet, j) => (
+                <li key={j}>{bullet}</li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </section>
+
+      <section className="resume__section">
+        <h2 className="resume__section-heading">Projects</h2>
+        {projects.map((project, i) => (
+          <div key={i} className="resume__job">
+            <div className="resume__job-header">
+              <div>
+                <span className="resume__job-company">{project.title}</span>
+                <span className="resume__job-role">
+                  {project.subtitle} · <Link to={project.subtitleLink.to}>{project.subtitleLink.label}</Link>
+                </span>
+              </div>
+              <span className="resume__job-period">{project.date}</span>
+            </div>
+            <ul className="resume__bullets">
+              {project.bullets.map((bullet, j) => (
                 <li key={j}>{bullet}</li>
               ))}
             </ul>
