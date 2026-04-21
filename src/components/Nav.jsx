@@ -23,6 +23,7 @@ function Nav({ theme, onToggle }) {
             Projects
           </NavLink>
           <DarkModeToggle theme={theme} onToggle={onToggle} />
+          <span id="nav-extra-slot" style={{ display: 'contents' }} />
         </div>
       </div>
     </nav>
