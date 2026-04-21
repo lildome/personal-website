@@ -136,6 +136,11 @@
   width: 90px;
 }
 
+.f-input--locked {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 
 /* ─── Buttons ─────────────────────────────────── */
 

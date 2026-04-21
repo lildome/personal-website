@@ -368,13 +368,15 @@ export default function Dashboard() {
                   <option value="archived">Archived</option>
                 </select>
                 <input
-                  className="db-filter-input"
+                  className={`db-filter-input${locked ? ' f-input--locked' : ''}`}
                   type="number"
                   min="0"
                   max="10"
                   placeholder="Min score"
                   value={minScore}
                   onChange={e => setMinScore(e.target.value)}
+                  disabled={locked}
+                  title={locked ? 'Unlock to filter by score' : undefined}
                 />
                 <button className="db-btn db-btn--secondary" onClick={loadJobs} disabled={loading}>
                   {loading ? '…' : 'Refresh'}

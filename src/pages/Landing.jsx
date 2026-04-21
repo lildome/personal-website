@@ -17,7 +17,7 @@ function Landing() {
           <Link to="/resume" className="btn btn--primary">
             View my resume
           </Link>
-          <Link to="/blog" className="btn btn--secondary">
+          <Link to="/projects/job-hunt" className="btn btn--secondary">
             See what I've been building
           </Link>
         </div>
