@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { Link } from 'react-router-dom'
 import projectData from '../data/projects.json'
 import ArchitectureDiagram from '../components/ArchitectureDiagram'
 import './Blog.css'
@@ -22,6 +23,24 @@ function Blog() {
               <span className="stat-card__value">{project.status}</span>
               <span className="stat-card__label">Status</span>
             </div>
+            {project.hookCta && (
+              <>
+                <div className="blog-hook__divider" />
+                <div className="blog-hook__cta-card">
+                  {project.hookCta.internal ? (
+                    <Link to={project.hookCta.to} className="blog-hook__cta-inner">
+                      <span className="blog-hook__cta-label">Dashboard</span>
+                      <span className="blog-hook__cta-text">{project.hookCta.text} →</span>
+                    </Link>
+                  ) : (
+                    <a href={project.hookCta.href} target="_blank" rel="noreferrer" className="blog-hook__cta-inner">
+                      <span className="blog-hook__cta-label">Dashboard</span>
+                      <span className="blog-hook__cta-text">{project.hookCta.text} →</span>
+                    </a>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </div>
       </section>
@@ -164,6 +183,31 @@ function Blog() {
           </ul>
         </div>
       </section>
+      {/* Section 9 — Explore */}
+      {project.explore && project.explore.length > 0 && (
+        <section className="blog-section blog-section--subtle">
+          <div className="blog-section__inner blog-section__inner--narrow">
+            <h2 className="blog-section__heading">Explore</h2>
+            <div className="explore-grid">
+              {project.explore.map((item, i) => (
+                <div key={i} className="explore-card">
+                  <div className="explore-card__body">
+                    <p className="explore-card__heading">{item.heading}</p>
+                    <p className="explore-card__para">{item.paragraph}</p>
+                  </div>
+                  <div className="explore-card__link">
+                    {item.link.internal ? (
+                      <Link to={item.link.to}>{item.link.text} →</Link>
+                    ) : (
+                      <a href={item.link.href} target="_blank" rel="noreferrer">{item.link.text} →</a>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
     </div>
   )
 }

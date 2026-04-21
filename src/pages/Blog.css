@@ -100,6 +100,48 @@
   color: var(--color-text-muted);
 }
 
+/* ── Hook: divider + CTA card ────────────────────────────────── */
+
+.blog-hook__divider {
+  width: 0.5px;
+  height: 48px;
+  background: var(--color-border);
+  align-self: center;
+  margin: 0 0.25rem;
+  flex-shrink: 0;
+}
+
+.blog-hook__cta-card {
+  background-color: var(--color-bg-surface);
+  border: 0.5px solid var(--color-accent);
+  border-radius: 12px;
+  padding: 1rem 1.5rem;
+  min-width: 120px;
+  transition: background-color 0.15s ease;
+}
+
+.blog-hook__cta-card:hover {
+  background-color: color-mix(in srgb, var(--color-bg-surface) 85%, var(--color-accent) 15%);
+}
+
+.blog-hook__cta-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  text-decoration: none;
+}
+
+.blog-hook__cta-label {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+}
+
+.blog-hook__cta-text {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--color-accent);
+}
+
 /* ── Section 2 — Problem ─────────────────────────────────────── */
 
 .problem-grid {
@@ -479,4 +521,62 @@
   position: absolute;
   left: 0;
   color: var(--color-accent);
+}
+
+/* ── Section 9 — Explore ─────────────────────────────────────── */
+
+.explore-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.explore-card {
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-bg-surface);
+  border: 0.5px solid var(--color-border);
+  border-left: 3px solid var(--color-accent);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.explore-card__body {
+  padding: 1rem 1.25rem;
+  flex: 1;
+}
+
+.explore-card__heading {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.explore-card__para {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+
+.explore-card__link {
+  padding: 0.75rem 1.25rem;
+  border-top: 0.5px solid var(--color-border);
+  margin-top: auto;
+}
+
+.explore-card__link a {
+  font-size: 0.875rem;
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.explore-card__link a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 600px) {
+  .explore-grid {
+    grid-template-columns: 1fr;
+  }
 }

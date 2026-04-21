@@ -69,6 +69,31 @@
         "My AWS experience going into this was surface level at best. Spinning up an EC2 instance when I was too lazy to run something locally, nothing that required services to actually talk to each other. Building something truly serverless for the first time was a different experience entirely. The learning curve wasn't in understanding what each service does, it was in understanding what happens when they interact in production. Rate limit windows, KMS permissions that fail silently, container manifests that Lambda rejects without telling you why. None of that is in any tutorial. It lives in the errors you hit when something that worked yesterday suddenly doesn't. What I didn't expect was how much the AWS ecosystem rewards that kind of digging. After a few years of sysadmin work where getting systems to talk to each other was a constant battle, having an ecosystem that's genuinely designed to integrate was a different experience. Once you understand the patterns, things just work together in a way that felt almost surprising.",
         "I started this project calling it \"Job Hunt Agents,\" and while I'm leaving that title in place I've come away realising I haven't built anything I would define as an AI agent. When you first learn to program you're taught about encapsulation and modularity. Encapsulation: everything you build should keep its hands to itself, with controlled ways of passing information around. Modularity: everything should serve a clear purpose and be reusable wherever you need it. It's my opinion that these two ideas define 80% of good development practice at a structural level, and so that's what I built. A bunch of small prompts, each with a specific goal, structured inputs, and structured outputs so they could talk to each other in a way I could control. And somewhere along the way I realised that's not what an agent is.\n\nGetting into definitions in an emerging field is always messy, but in my mind an agent has a goal and maybe a little structure around how to achieve it, and then you let it do its thing. Find its own way to the answer. Now as a developer with control issues, I cannot just let my code go off and run itself. So I broke it into steps, integrated those steps with the LLM, kept easy breakpoints and a clear separation of concerns. It works. But it's not an agent. It's an LLM powered workflow. The LLMs aren't making decisions, they aren't given agency, and so they aren't agents.\n\nCould this have been done faster with a true agent? Probably. A single prompt along the lines of \"you're an expert recruiter, go find suitable jobs for this candidate\" and Claude figures out the rest. But then I lose control. It becomes a black box that eats tokens and eventually spits out an answer, with minimal insight into how it got there or how to replicate it. So in the end I'm glad I didn't build an agent. I don't think an agent would give me the control I need to make sure this project works tomorrow, and next week, and next year."
       ],
+      "hookCta": {
+        "text": "See it running",
+        "to": "/projects/job-hunt/dashboard",
+        "internal": true
+      },
+      "explore": [
+        {
+          "heading": "Dashboard",
+          "paragraph": "Reading about it only goes so far. Go take a look. Real listings, real company research, AI-generated outputs against actual job descriptions. Browsable without a login.",
+          "link": {
+            "text": "See it running",
+            "to": "/projects/job-hunt/dashboard",
+            "internal": true
+          }
+        },
+        {
+          "heading": "GitHub",
+          "paragraph": "The full source for the pipeline, Lambda functions, and frontend. If you want to see how any of it actually works, this is the place.",
+          "link": {
+            "text": "View source",
+            "href": "https://github.com/lildome/job-hunt-agents",
+            "internal": false
+          }
+        }
+      ],
       "nextSteps": {
         "heading": "What I'd build next",
         "intro": "The project works well for what it is right now. These are the two things that would make it useful beyond just me.",
