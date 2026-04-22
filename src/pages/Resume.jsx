@@ -65,7 +65,6 @@ function Resume() {
                 <span className="resume__job-role">{project.subtitle}</span>
               </div>
               <div className="resume__job-header-right">
-                <span className="resume__job-period">{project.date}</span>
                 <Link
                   to={project.subtitleLink.to}
                   className="resume__project-link"
