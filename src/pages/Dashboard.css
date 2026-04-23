@@ -976,6 +976,10 @@
 
 /* ─── Resume output panel ─────────────────────── */
 
+.db-resume-preview {
+  /* spacing inherited from db-card */
+}
+
 .db-resume-preview__header {
   display: flex;
   align-items: center;

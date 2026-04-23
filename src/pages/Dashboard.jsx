@@ -50,45 +50,10 @@ function StatusPill({ status }) {
   return <span className={`db-status-pill db-status-pill--${slug}`}>{status || '—'}</span>
 }
 
-function buildResumeFilename(company, role) {
-  if (!company && !role) return 'Resume.pdf'
-  const sanitize = s => s.replace(/\s+/g, '_').replace(/[/\\:*?"<>|]/g, '').replace(/^_+|_+$/g, '')
-  const parts = [company, role].filter(Boolean).map(sanitize)
-  const base = parts.join('_') + '_Resume'
-  return (base.length > 116 ? base.slice(0, 116) : base) + '.pdf'
-}
-
-function base64ToBlob(base64) {
-  const byteChars = atob(base64)
-  const bytes = new Uint8Array(byteChars.length)
-  for (let i = 0; i < byteChars.length; i++) bytes[i] = byteChars.charCodeAt(i)
-  return new Blob([bytes], { type: 'application/pdf' })
-}
-
-function ResumeOutputPanel({ pdfBase64, markdown, company, role }) {
+function ResumeOutputPanel({ pdfUrl, markdown }) {
   const [showRaw, setShowRaw] = useState(false)
-  const [blobUrl, setBlobUrl] = useState(null)
 
-  useEffect(() => {
-    if (!pdfBase64) { setBlobUrl(null); return }
-    const url = URL.createObjectURL(base64ToBlob(pdfBase64))
-    setBlobUrl(url)
-    return () => URL.revokeObjectURL(url)
-  }, [pdfBase64])
-
-  function downloadPdf() {
-    if (!pdfBase64) return
-    const url = URL.createObjectURL(base64ToBlob(pdfBase64))
-    const a = document.createElement('a')
-    a.href = url
-    a.download = buildResumeFilename(company, role)
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-  }
-
-  if (!pdfBase64) {
+  if (!pdfUrl) {
     return (
       <div className="db-card">
         <span className="db-section-label">Tailored resume</span>
@@ -99,20 +64,18 @@ function ResumeOutputPanel({ pdfBase64, markdown, company, role }) {
   }
 
   return (
-    <div className="db-card">
+    <div className="db-card db-resume-preview">
       <div className="db-resume-preview__header">
         <span className="db-section-label db-section-label--inline">Tailored resume</span>
-        <button className="db-btn db-btn--accent" type="button" onClick={downloadPdf}>
+        <a href={pdfUrl} download className="db-btn db-btn--accent">
           Download PDF
-        </button>
+        </a>
       </div>
-      {blobUrl && (
-        <iframe
-          src={blobUrl}
-          title="Tailored resume preview"
-          className="db-resume-preview__iframe"
-        />
-      )}
+      <iframe
+        src={pdfUrl}
+        title="Tailored resume preview"
+        className="db-resume-preview__iframe"
+      />
       <p className="db-resume-preview__mobile-note">PDF preview is only available on desktop.</p>
       <button className="db-raw-toggle" type="button" onClick={() => setShowRaw(v => !v)}>
         View raw markdown {showRaw ? '▾' : '▸'}
@@ -270,7 +233,7 @@ export default function Dashboard() {
       setOutputPanel({
         type: 'resume',
         content: data.tailored_resume,
-        pdfBase64: data.tailored_resume_pdf,
+        pdfUrl: data.tailored_resume_pdf_url,
       })
     } finally {
       setActionLoading(false)
@@ -686,10 +649,8 @@ export default function Dashboard() {
                   {/* Output panel — resume */}
                   {outputPanel?.type === 'resume' && (
                     <ResumeOutputPanel
-                      pdfBase64={outputPanel.pdfBase64}
+                      pdfUrl={outputPanel.pdfUrl}
                       markdown={outputPanel.content}
-                      company={jobDetail.job.company}
-                      role={jobDetail.job.positionName}
                     />
                   )}
 
