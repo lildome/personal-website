@@ -974,7 +974,78 @@
 }
 
 
-/* ─── Resume output panel ─────────────────────── */
+/* ─── Resume output panel (async state machine) ── */
+
+.db-resume-panel {
+  background: var(--color-bg-surface);
+  border: 0.5px solid var(--color-border);
+  border-radius: 10px;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.db-resume-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.db-resume-panel__actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.db-resume-panel__iframe {
+  display: block;
+  width: 100%;
+  height: 720px;
+  border: 0.5px solid var(--color-border);
+  border-radius: 6px;
+}
+
+.db-resume-panel__mobile-note {
+  display: none;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  margin-top: 0.6rem;
+}
+
+@media (max-width: 768px) {
+  .db-resume-panel__iframe { display: none; }
+  .db-resume-panel__mobile-note { display: block; }
+}
+
+.db-resume-panel__progress {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border: 0.5px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg-subtle);
+}
+
+.db-resume-panel__progress-text {
+  font-size: 0.84rem;
+  color: var(--color-text-primary);
+  font-family: 'Courier New', monospace;
+}
+
+.db-resume-panel__error {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.db-resume-panel__error-text {
+  font-size: 0.82rem;
+  color: rgba(196, 80, 80, 0.85);
+  line-height: 1.5;
+}
+
+
+/* ─── Resume output panel (legacy, kept for reference) ── */
 
 .db-resume-preview {
   /* spacing inherited from db-card */

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import './Dashboard.css'
@@ -50,39 +50,73 @@ function StatusPill({ status }) {
   return <span className={`db-status-pill db-status-pill--${slug}`}>{status || '—'}</span>
 }
 
-function ResumeOutputPanel({ pdfUrl, markdown }) {
-  const [showRaw, setShowRaw] = useState(false)
+function ResumeOutputPanel({ status, pdfUrl, startedAt, error, onRegenerate }) {
+  const [elapsed, setElapsed] = useState(0)
 
-  if (!pdfUrl) {
+  useEffect(() => {
+    if (status !== 'generating') {
+      setElapsed(0)
+      return
+    }
+    const base = startedAt ? new Date(startedAt).getTime() : Date.now()
+    setElapsed(Math.floor((Date.now() - base) / 1000))
+    const interval = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - base) / 1000))
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [status, startedAt])
+
+  if (status === 'generating') {
     return (
-      <div className="db-card">
-        <span className="db-section-label">Tailored resume</span>
-        <p className="db-resume-fallback-note">PDF generation unavailable — showing raw markdown.</p>
-        <pre className="db-output-pre">{markdown}</pre>
+      <div className="db-resume-panel">
+        <div className="db-resume-panel__progress">
+          <span className="db-resume-panel__progress-text">
+            Generating resume... {elapsed}s
+          </span>
+        </div>
       </div>
     )
   }
 
-  return (
-    <div className="db-card db-resume-preview">
-      <div className="db-resume-preview__header">
-        <span className="db-section-label db-section-label--inline">Tailored resume</span>
-        <a href={pdfUrl} download className="db-btn db-btn--accent">
-          Download PDF
-        </a>
+  if (status === 'done') {
+    return (
+      <div className="db-resume-panel">
+        <div className="db-resume-panel__header">
+          <span className="db-section-label db-section-label--inline">Tailored resume</span>
+          <div className="db-resume-panel__actions">
+            <button className="db-btn db-btn--secondary" type="button" onClick={onRegenerate}>
+              Regenerate
+            </button>
+            <a href={pdfUrl} download className="db-btn db-btn--accent">
+              Download PDF
+            </a>
+          </div>
+        </div>
+        <iframe
+          src={pdfUrl}
+          title="Tailored resume preview"
+          className="db-resume-panel__iframe"
+        />
+        <p className="db-resume-panel__mobile-note">PDF preview is only available on desktop.</p>
       </div>
-      <iframe
-        src={pdfUrl}
-        title="Tailored resume preview"
-        className="db-resume-preview__iframe"
-      />
-      <p className="db-resume-preview__mobile-note">PDF preview is only available on desktop.</p>
-      <button className="db-raw-toggle" type="button" onClick={() => setShowRaw(v => !v)}>
-        View raw markdown {showRaw ? '▾' : '▸'}
-      </button>
-      {showRaw && <pre className="db-output-pre">{markdown}</pre>}
-    </div>
-  )
+    )
+  }
+
+  if (status === 'failed') {
+    return (
+      <div className="db-resume-panel">
+        <div className="db-resume-panel__error">
+          <span className="db-section-label">Resume generation failed</span>
+          {error && <p className="db-resume-panel__error-text">{error}</p>}
+          <button className="db-btn db-btn--accent" type="button" onClick={onRegenerate}>
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return null
 }
 
 export default function Dashboard() {
@@ -113,6 +147,10 @@ export default function Dashboard() {
   const [scrapeSuccess, setScrapeSuccess] = useState(false)
   const [scrapeLoading, setScrapeLoading] = useState(false)
 
+  const currentJobIdRef = useRef(null)
+  const pollIntervalRef = useRef(null)
+  const pollStartRef = useRef(null)
+
   useEffect(() => {
     setNavSlot(document.getElementById('nav-extra-slot'))
     if (!isSessionValid()) {
@@ -125,6 +163,71 @@ export default function Dashboard() {
     clearSession()
     setLocked(true)
   }, [])
+
+  useEffect(() => {
+    currentJobIdRef.current = selectedJobId
+  }, [selectedJobId])
+
+  useEffect(() => {
+    const resumeStatus = jobDetail?.resume?.status
+    const jobId = jobDetail?.job?.id
+
+    if (resumeStatus !== 'generating' || !jobId) {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current)
+        pollIntervalRef.current = null
+        pollStartRef.current = null
+      }
+      return
+    }
+
+    if (pollIntervalRef.current) return
+
+    if (!pollStartRef.current) {
+      pollStartRef.current = Date.now()
+    }
+
+    pollIntervalRef.current = setInterval(async () => {
+      if (Date.now() - pollStartRef.current > 90_000) {
+        clearInterval(pollIntervalRef.current)
+        pollIntervalRef.current = null
+        pollStartRef.current = null
+        setJobDetail(prev => prev && prev.job.id === jobId
+          ? { ...prev, resume: { ...prev.resume, status: 'failed', error: 'Generation is taking longer than expected. Check back in a few minutes.' } }
+          : prev
+        )
+        return
+      }
+
+      if (currentJobIdRef.current !== jobId) {
+        clearInterval(pollIntervalRef.current)
+        pollIntervalRef.current = null
+        pollStartRef.current = null
+        return
+      }
+
+      try {
+        const res = await apiFetch(`/jobs/${jobId}/generation-status`)
+        if (res.status === 401) { handleUnauth(); return }
+        const data = await res.json()
+        if (currentJobIdRef.current !== jobId) return
+        setJobDetail(prev => prev && prev.job.id === jobId
+          ? { ...prev, resume: data.resume, cover_letter: data.cover_letter }
+          : prev
+        )
+      } catch {
+        // ignore transient network errors during polling
+      }
+    }, 3000)
+
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current)
+        pollIntervalRef.current = null
+        pollStartRef.current = null
+      }
+    }
+  }, [jobDetail?.resume?.status, jobDetail?.job?.id, handleUnauth])
 
   const loadJobs = useCallback(async () => {
     setLoading(true)
@@ -225,19 +328,20 @@ export default function Dashboard() {
 
   async function runResume() {
     if (locked) { openModal(); return }
-    setActionLoading(true)
-    try {
-      const res = await apiFetch(`/jobs/${selectedJobId}/resume`, { method: 'POST' })
-      if (res.status === 401) { handleUnauth(); openModal(); return }
-      const data = await res.json()
-      setOutputPanel({
-        type: 'resume',
-        content: data.tailored_resume,
-        pdfUrl: data.tailored_resume_pdf_url,
-      })
-    } finally {
-      setActionLoading(false)
-    }
+
+    setJobDetail(prev => prev ? {
+      ...prev,
+      resume: {
+        status: 'generating',
+        pdf_url: null,
+        started_at: new Date().toISOString(),
+        error: null,
+      }
+    } : prev)
+
+    const res = await apiFetch(`/jobs/${selectedJobId}/resume`, { method: 'POST' })
+    if (res.status === 401) { handleUnauth(); openModal(); return }
+    // 202 — polling picks up the real status
   }
 
   async function runCoverLetter() {
@@ -564,7 +668,6 @@ export default function Dashboard() {
                       <button
                         className={locked ? 'db-btn db-btn--locked' : 'db-btn db-btn--accent'}
                         onClick={locked ? openModal : runResume}
-                        disabled={actionLoading}
                         type="button"
                       >
                         Tailor resume
@@ -647,10 +750,13 @@ export default function Dashboard() {
                   )}
 
                   {/* Output panel — resume */}
-                  {outputPanel?.type === 'resume' && (
+                  {jobDetail.resume && jobDetail.resume.status !== 'none' && (
                     <ResumeOutputPanel
-                      pdfUrl={outputPanel.pdfUrl}
-                      markdown={outputPanel.content}
+                      status={jobDetail.resume.status}
+                      pdfUrl={jobDetail.resume.pdf_url}
+                      startedAt={jobDetail.resume.started_at}
+                      error={jobDetail.resume.error}
+                      onRegenerate={runResume}
                     />
                   )}
 
