@@ -84,7 +84,7 @@ function ResumeOutputPanel({ status, pdfUrl, startedAt, error, onRegenerate }) {
         <div className="db-resume-panel__header">
           <span className="db-section-label db-section-label--inline">Tailored resume</span>
           <div className="db-resume-panel__actions">
-            <button className="db-btn db-btn--secondary" type="button" onClick={onRegenerate}>
+            <button className="db-btn db-btn--secondary" type="button" onClick={onRegenerate} disabled={status === 'generating'}>
               Regenerate
             </button>
             <a href={pdfUrl} download className="db-btn db-btn--accent">
@@ -108,7 +108,7 @@ function ResumeOutputPanel({ status, pdfUrl, startedAt, error, onRegenerate }) {
         <div className="db-resume-panel__error">
           <span className="db-section-label">Resume generation failed</span>
           {error && <p className="db-resume-panel__error-text">{error}</p>}
-          <button className="db-btn db-btn--accent" type="button" onClick={onRegenerate}>
+          <button className="db-btn db-btn--accent" type="button" onClick={onRegenerate} disabled={status === 'generating'}>
             Retry
           </button>
         </div>
@@ -668,6 +668,7 @@ export default function Dashboard() {
                       <button
                         className={locked ? 'db-btn db-btn--locked' : 'db-btn db-btn--accent'}
                         onClick={locked ? openModal : runResume}
+                        disabled={jobDetail.resume?.status === 'generating'}
                         type="button"
                       >
                         Tailor resume
