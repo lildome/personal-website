@@ -1,10 +1,10 @@
 {
   "name": "Dominick Profico",
-  "title": "Software Engineer",
   "location": "Melbourne, VIC",
   "phone": "0488 171 909",
   "email": "dominickfprofico@gmail.com",
   "linkedin": "www.linkedin.com/in/dominick-profico-4668b8272",
+  "github": "github.com/lildome",
   "summary": "Across internships, research, and two years of full-time work, I've built production systems in environments where reliability actually matters. I gravitate toward problems that require understanding something deeply before solving it, and I'm currently looking for a role where that approach is an asset rather than a slow-down.",
   "experience": [
     {
@@ -12,11 +12,10 @@
       "role": "Systems Engineer",
       "period": "July 2023 – August 2025",
       "bullets": [
-        "Led the migration of 400+ physical machines from Slackware to Debian Linux, unifying the OS environment and laying the groundwork for standardised deployment across the fleet.",
-        "Reduced system configuration time from a full day to 30 minutes by building and deploying Ansible and Bash automation across production endpoints.",
-        "Implemented CIS security compliance across the fleet by developing automated Debian build images and deployment scripts, and collaborating with the team to bring existing software into compliance with the standard.",
-        "Maintained live radar data collection systems across 15 FAA sites, keeping high-availability infrastructure stable on ageing hardware through monitoring scripts and hands-on troubleshooting.",
-        "Built Python tooling using OpenCV and proprietary image processing logic to automate product defect identification and analysis."
+        "Led the migration of 400+ machines from Slackware to Debian, building Ansible and Bash automation that reduced per-machine configuration time from a full day to 30 minutes.",
+        "Implemented CIS security compliance across the fleet by developing automated Debian build images and deployment scripts.",
+        "Maintained live radar data collection systems across 15 FAA sites, keeping high-availability infrastructure stable on ageing hardware.",
+        "Built Python tooling using OpenCV and proprietary image processing logic to automate product defect identification."
       ]
     },
     {
@@ -25,7 +24,7 @@
       "period": "May 2022 – August 2022",
       "bullets": [
         "Optimised core computational algorithms for mass spectrometry data analysis, achieving a 90% reduction in execution time.",
-        "Implemented data ingestion pipelines in Python, taking the research groundwork established during the student researcher engagement through to a production-ready state."
+        "Implemented production data ingestion pipelines in Python, taking research groundwork through to a deployed system."
       ]
     },
     {
@@ -33,9 +32,8 @@
       "role": "Student Researcher",
       "period": "January 2021 – May 2023",
       "bullets": [
-        "Researched and developed a text summarisation algorithm using knowledge graph methodology, building graph representations of documents to extract core meaning. Presented findings at an undergraduate research conference.",
-        "Designed the architecture and laid the groundwork for large-scale data ingestion pipelines in Python, later implemented during the BMS internship and refined post-internship.",
-        "Formally mentored four students across the research team, including involvement in the hiring process and guiding a Python codebase modernisation that improved maintainability across the project."
+        "Researched a knowledge-graph text summarisation algorithm; presented findings at an undergraduate research conference.",
+        "Mentored four students through a Python codebase modernisation that improved maintainability across the project."
       ]
     },
     {
@@ -43,8 +41,8 @@
       "role": "Computer Science Intern",
       "period": "May 2021 – August 2021",
       "bullets": [
-        "Built automation tooling to collect test results, generate structured reports, and organise historical data for mission-critical air traffic control systems.",
-        "Supported regression testing efforts for air traffic control systems, including assisting in the development of new test procedures to recreate and diagnose field issues."
+        "Built Python and VBA (for Excel) automation tooling to collect test results, generate structured reports, and organise historical data for mission-critical air traffic control systems.",
+        "Supported regression testing for ATC systems, including developing new test procedures to recreate and diagnose field issues."
       ]
     }
   ],
@@ -55,7 +53,9 @@
       "subtitle": "Personal project",
       "subtitleLink": { "label": "Full writeup →", "to": "/projects/job-hunt" },
       "bullets": [
-        "Built an AI pipeline on AWS that automates the full job-hunting workflow: scraping listings, summarising them, researching companies, matching against a candidate profile, and generating tailored resumes and cover letters. Eight Lambda functions, SQS orchestration, DynamoDB, and Claude Sonnet via the Anthropic API. Built the first half myself, used Claude Code for the remainder."
+        "Orchestrated Lambda functions through a single SQS consumer with bounded concurrency, pacing LLM calls to stay within provider rate limits and prevent cascading failures.",
+        "Built a composable pipeline of single-purpose prompts with structured input/output, chaining summarisation, company research, CV matching, and content generation through Claude Sonnet.",
+        "Full-stack on AWS (Lambda · SQS · DynamoDB · API Gateway · Amplify) with a React dashboard for browsing results and triggering on-demand resume tailoring and cover letter generation."
       ]
     }
   ],
@@ -148,11 +148,12 @@
       }
     ]
   },
-  "education": [
-    {
-      "institution": "Rowan University",
-      "degree": "B.S. Computer Science (GPA: 3.8/4.0) & B.A. Mathematics (GPA: 3.9/4.0)",
-      "year": "May 2023"
-    }
-  ]
+  "education": {
+    "institution": "Rowan University",
+    "year": "May 2023",
+    "degrees": [
+      "B.S. Computer Science (3.8)",
+      "B.A. Mathematics (3.9)"
+    ]
+  }
 }

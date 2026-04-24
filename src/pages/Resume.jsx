@@ -5,11 +5,11 @@ import './Resume.css'
 function Resume() {
   const {
     name,
-    title,
     location,
     phone,
     email,
     linkedin,
+    github,
     summary,
     experience,
     projects,
@@ -21,12 +21,12 @@ function Resume() {
     <div className="resume">
       <header className="resume__header">
         <h1 className="resume__name">{name}</h1>
-        <p className="resume__title">{title}</p>
         <div className="resume__contact">
           <span>{location}</span>
           <span>{phone}</span>
           <span>{email}</span>
           <a href={`https://${linkedin}`} target="_blank" rel="noreferrer">{linkedin}</a>
+          <a href={`https://${github}`} target="_blank" rel="noreferrer">{github}</a>
         </div>
       </header>
 
@@ -104,15 +104,15 @@ function Resume() {
 
       <section className="resume__section">
         <h2 className="resume__section-heading">Education</h2>
-        {education.map((edu, i) => (
-          <div key={i} className="resume__education">
-            <div className="resume__education-header">
-              <span className="resume__education-institution">{edu.institution}</span>
-              <span className="resume__education-year">{edu.year}</span>
-            </div>
-            <p className="resume__education-degree">{edu.degree}</p>
+        <div className="resume__education">
+          <div className="resume__education-header">
+            <span className="resume__education-institution">{education.institution}</span>
+            <span className="resume__education-year">{education.year}</span>
           </div>
-        ))}
+          {education.degrees.map((degree, i) => (
+            <p key={i} className="resume__education-degree">{degree}</p>
+          ))}
+        </div>
       </section>
     </div>
   )
