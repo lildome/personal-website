@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import './Dashboard.css'
 
-const API_BASE = 'https://nvv4c6g5jl.execute-api.us-east-1.amazonaws.com/prod'
+const API_BASE = import.meta.env.VITE_API_BASE_URL
 
 function getToken() {
   return localStorage.getItem('dashboard_token')

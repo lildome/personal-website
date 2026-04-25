@@ -1,8 +1,57 @@
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import resumeData from '../data/resume.json'
 import './Resume.css'
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL
+
 function Resume() {
+  const [profile, setProfile] = useState(null)
+  const [error, setError] = useState(false)
+
+  useEffect(() => {
+    let ignore = false
+
+    async function fetchProfile() {
+      try {
+        const response = await fetch(`${API_BASE}/profile`)
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+        const data = await response.json()
+        if (!ignore) setProfile(data)
+      } catch {
+        if (!ignore) setError(true)
+      }
+    }
+
+    fetchProfile()
+    return () => { ignore = true }
+  }, [])
+
+  if (error) {
+    return (
+      <div className="resume">
+        <p>
+          Resume temporarily unavailable. You can find me on{' '}
+          <a
+            href="https://www.linkedin.com/in/dominick-profico-4668b8272/"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            LinkedIn
+          </a>
+          .
+        </p>
+      </div>
+    )
+  }
+
+  if (!profile) {
+    return (
+      <div className="resume">
+        <p style={{ textAlign: 'center' }}>Loading...</p>
+      </div>
+    )
+  }
+
   const {
     name,
     location,
@@ -15,7 +64,7 @@ function Resume() {
     projects,
     skills,
     education,
-  } = resumeData
+  } = profile
 
   return (
     <div className="resume">
@@ -64,15 +113,17 @@ function Resume() {
                 <span className="resume__job-company">{project.title}</span>
                 <span className="resume__job-role">{project.subtitle}</span>
               </div>
-              <div className="resume__job-header-right">
-                <Link
-                  to={project.subtitleLink.to}
-                  className="resume__project-link"
-                  onClick={() => window.scrollTo(0, 0)}
-                >
-                  {project.subtitleLink.label}
-                </Link>
-              </div>
+              {project.subtitleLink && (
+                <div className="resume__job-header-right">
+                  <Link
+                    to={project.subtitleLink.to}
+                    className="resume__project-link"
+                    onClick={() => window.scrollTo(0, 0)}
+                  >
+                    {project.subtitleLink.label}
+                  </Link>
+                </div>
+              )}
             </div>
             <ul className="resume__bullets">
               {project.bullets.map((bullet, j) => (
