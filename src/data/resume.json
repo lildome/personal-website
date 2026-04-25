@@ -49,7 +49,6 @@
   "projects": [
     {
       "title": "Job Hunt Agents",
-      "date": "2024 – Present",
       "subtitle": "Personal project",
       "subtitleLink": { "label": "Full writeup →", "to": "/projects/job-hunt" },
       "bullets": [

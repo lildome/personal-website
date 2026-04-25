@@ -28,3 +28,7 @@ dist-ssr
 
 # OS files
 .DS_Store
+
+# Other
+sync_profile_to_ddb.py
+ddb_backup_*.json
