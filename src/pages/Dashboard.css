@@ -973,6 +973,67 @@
   color: var(--color-text-secondary);
 }
 
+.db-modal--wide {
+  max-width: 560px;
+  align-items: stretch;
+  text-align: left;
+}
+
+.db-modal--wide .db-modal__heading {
+  text-align: left;
+  margin-bottom: 1rem;
+}
+
+.db-modal__textarea {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  background: var(--color-bg-subtle);
+  border: 0.5px solid var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text-primary);
+  font-family: inherit;
+  font-size: 0.84rem;
+  line-height: 1.55;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+
+.db-modal__textarea:focus {
+  border-color: var(--color-accent);
+}
+
+.db-modal__textarea::placeholder {
+  color: var(--color-text-muted);
+}
+
+.db-modal__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.db-modal__footer .db-btn {
+  height: 34px;
+  font-size: 0.82rem;
+}
+
+
+/* ─── Cover letter panel ──────────────────────── */
+
+.db-cover-letter-panel__open-link {
+  font-size: 0.82rem;
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.db-cover-letter-panel__open-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 
 /* ─── Resume output panel (async state machine) ── */
 

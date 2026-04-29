@@ -119,6 +119,161 @@ function ResumeOutputPanel({ status, pdfUrl, startedAt, error, onRegenerate }) {
   return null
 }
 
+function RevisionFeedbackModal({ open, onClose, onSubmit }) {
+  const [feedback, setFeedback] = useState('')
+  const modalRef = useRef(null)
+
+  useEffect(() => {
+    if (open) setFeedback('')
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    function handleEsc(e) {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', handleEsc)
+    return () => document.removeEventListener('keydown', handleEsc)
+  }, [open, onClose])
+
+  useEffect(() => {
+    if (!open) return
+    const modal = modalRef.current
+    if (!modal) return
+    const focusable = modal.querySelectorAll('button, textarea, input, [tabindex]:not([tabindex="-1"])')
+    const first = focusable[0]
+    const last = focusable[focusable.length - 1]
+    function trapFocus(e) {
+      if (e.key !== 'Tab') return
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last.focus() }
+      } else {
+        if (document.activeElement === last) { e.preventDefault(); first.focus() }
+      }
+    }
+    document.addEventListener('keydown', trapFocus)
+    return () => document.removeEventListener('keydown', trapFocus)
+  }, [open])
+
+  if (!open) return null
+
+  return (
+    <div className="db-modal-scrim" onClick={onClose}>
+      <div className="db-modal db-modal--wide" ref={modalRef} onClick={e => e.stopPropagation()}>
+        <h2 className="db-modal__heading">Request revision</h2>
+        <textarea
+          className="db-modal__textarea"
+          autoFocus
+          value={feedback}
+          onChange={e => setFeedback(e.target.value)}
+          placeholder="What would you like to change about this cover letter? Be specific about which paragraphs or what aspects need adjustment."
+          rows={7}
+        />
+        <div className="db-modal__footer">
+          <button className="db-btn db-btn--secondary" type="button" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            className="db-btn db-btn--accent"
+            type="button"
+            disabled={!feedback.trim()}
+            onClick={() => { onSubmit(feedback); onClose() }}
+          >
+            Request revision
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function CoverLetterOutputPanel({ status, pdfUrl, startedAt, error, onRegenerate, onRevise }) {
+  const [elapsed, setElapsed] = useState(0)
+  const [revisionModalOpen, setRevisionModalOpen] = useState(false)
+
+  useEffect(() => {
+    if (status !== 'generating') {
+      setElapsed(0)
+      return
+    }
+    const base = startedAt ? new Date(startedAt).getTime() : Date.now()
+    setElapsed(Math.floor((Date.now() - base) / 1000))
+    const interval = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - base) / 1000))
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [status, startedAt])
+
+  if (status === 'generating') {
+    return (
+      <div className="db-resume-panel">
+        <div className="db-resume-panel__progress">
+          <span className="db-resume-panel__progress-text">
+            Generating cover letter... {elapsed}s
+          </span>
+        </div>
+      </div>
+    )
+  }
+
+  if (status === 'done') {
+    return (
+      <>
+        <div className="db-resume-panel">
+          <div className="db-resume-panel__header">
+            <span className="db-section-label db-section-label--inline">Cover letter</span>
+            <div className="db-resume-panel__actions">
+              <button className="db-btn db-btn--secondary" type="button" onClick={() => setRevisionModalOpen(true)}>
+                Revise
+              </button>
+              <button className="db-btn db-btn--secondary" type="button" onClick={onRegenerate}>
+                Regenerate
+              </button>
+              <a href={pdfUrl} download className="db-btn db-btn--accent">
+                Download PDF
+              </a>
+            </div>
+          </div>
+          <iframe
+            src={pdfUrl}
+            title="Cover letter preview"
+            className="db-resume-panel__iframe"
+          />
+          <a
+            href={pdfUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="db-resume-panel__mobile-note db-cover-letter-panel__open-link"
+          >
+            Open PDF →
+          </a>
+        </div>
+        <RevisionFeedbackModal
+          open={revisionModalOpen}
+          onClose={() => setRevisionModalOpen(false)}
+          onSubmit={feedback => onRevise(feedback)}
+        />
+      </>
+    )
+  }
+
+  if (status === 'failed') {
+    return (
+      <div className="db-resume-panel">
+        <div className="db-resume-panel__error">
+          <span className="db-section-label">Cover letter generation failed</span>
+          {error && <p className="db-resume-panel__error-text">{error}</p>}
+          <button className="db-btn db-btn--accent" type="button" onClick={onRegenerate}>
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return null
+}
+
 export default function Dashboard() {
   const [locked, setLocked] = useState(() => !isSessionValid())
   const [navSlot, setNavSlot] = useState(null)
@@ -139,10 +294,6 @@ export default function Dashboard() {
   const [statusFilter, setStatusFilter] = useState('')
   const [minScore, setMinScore] = useState('')
 
-  const [outputPanel, setOutputPanel] = useState(null)
-  const [guidedFeedback, setGuidedFeedback] = useState('')
-  const [actionLoading, setActionLoading] = useState(false)
-
   const [scrapeForm, setScrapeForm] = useState({ position: '', location: '', country: 'US', maxItems: 25 })
   const [scrapeSuccess, setScrapeSuccess] = useState(false)
   const [scrapeLoading, setScrapeLoading] = useState(false)
@@ -150,6 +301,7 @@ export default function Dashboard() {
   const currentJobIdRef = useRef(null)
   const pollIntervalRef = useRef(null)
   const pollStartRef = useRef(null)
+  const coverLetterPollStartRef = useRef(null)
 
   useEffect(() => {
     setNavSlot(document.getElementById('nav-extra-slot'))
@@ -170,39 +322,48 @@ export default function Dashboard() {
 
   useEffect(() => {
     const resumeStatus = jobDetail?.resume?.status
+    const coverLetterStatus = jobDetail?.cover_letter?.status
     const jobId = jobDetail?.job?.id
 
-    if (resumeStatus !== 'generating' || !jobId) {
+    const eitherGenerating = resumeStatus === 'generating' || coverLetterStatus === 'generating'
+
+    if (!eitherGenerating || !jobId) {
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current)
         pollIntervalRef.current = null
-        pollStartRef.current = null
       }
+      pollStartRef.current = null
+      coverLetterPollStartRef.current = null
       return
     }
 
     if (pollIntervalRef.current) return
 
-    if (!pollStartRef.current) {
-      pollStartRef.current = Date.now()
-    }
+    pollStartRef.current = resumeStatus === 'generating' ? Date.now() : null
+    coverLetterPollStartRef.current = coverLetterStatus === 'generating' ? Date.now() : null
 
     pollIntervalRef.current = setInterval(async () => {
-      if (Date.now() - pollStartRef.current > 90_000) {
-        clearInterval(pollIntervalRef.current)
-        pollIntervalRef.current = null
+      const now = Date.now()
+
+      if (pollStartRef.current && now - pollStartRef.current > 90_000) {
         pollStartRef.current = null
-        setJobDetail(prev => prev && prev.job.id === jobId
-          ? { ...prev, resume: { ...prev.resume, status: 'failed', error: 'Generation is taking longer than expected. Check back in a few minutes.' } }
-          : prev
-        )
-        return
+        setJobDetail(prev => {
+          if (!prev || prev.job.id !== jobId || prev.resume?.status !== 'generating') return prev
+          return { ...prev, resume: { ...prev.resume, status: 'failed', error: 'Generation is taking longer than expected. Check back in a few minutes.' } }
+        })
+      }
+
+      if (coverLetterPollStartRef.current && now - coverLetterPollStartRef.current > 90_000) {
+        coverLetterPollStartRef.current = null
+        setJobDetail(prev => {
+          if (!prev || prev.job.id !== jobId || prev.cover_letter?.status !== 'generating') return prev
+          return { ...prev, cover_letter: { ...prev.cover_letter, status: 'failed', error: 'Generation is taking longer than expected. Check back in a few minutes.' } }
+        })
       }
 
       if (currentJobIdRef.current !== jobId) {
         clearInterval(pollIntervalRef.current)
         pollIntervalRef.current = null
-        pollStartRef.current = null
         return
       }
 
@@ -224,10 +385,9 @@ export default function Dashboard() {
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current)
         pollIntervalRef.current = null
-        pollStartRef.current = null
       }
     }
-  }, [jobDetail?.resume?.status, jobDetail?.job?.id, handleUnauth])
+  }, [jobDetail?.resume?.status, jobDetail?.cover_letter?.status, jobDetail?.job?.id, handleUnauth])
 
   const loadJobs = useCallback(async () => {
     setLoading(true)
@@ -261,7 +421,6 @@ export default function Dashboard() {
     setSelectedJobId(id)
     setView('detail')
     setJobDetail(null)
-    setOutputPanel(null)
     loadJobDetail(id)
   }
 
@@ -269,7 +428,6 @@ export default function Dashboard() {
     setView('list')
     setSelectedJobId(null)
     setJobDetail(null)
-    setOutputPanel(null)
   }
 
   function openModal() {
@@ -346,55 +504,54 @@ export default function Dashboard() {
 
   async function runCoverLetter() {
     if (locked) { openModal(); return }
-    setActionLoading(true)
-    try {
-      const res = await apiFetch(`/jobs/${selectedJobId}/cover-letter`, {
-        method: 'POST',
-        body: JSON.stringify({ mode: 'autonomous' }),
-      })
-      if (res.status === 401) { handleUnauth(); openModal(); return }
-      const data = await res.json()
-      setOutputPanel({ type: 'cover-letter', content: data.cover_letter })
-    } finally {
-      setActionLoading(false)
-    }
+
+    setJobDetail(prev => prev ? {
+      ...prev,
+      cover_letter: {
+        status: 'generating',
+        pdf_url: null,
+        started_at: new Date().toISOString(),
+        error: null,
+      }
+    } : prev)
+
+    const res = await apiFetch(`/jobs/${selectedJobId}/cover-letter`, {
+      method: 'POST',
+      body: JSON.stringify({ mode: 'generate' }),
+    })
+    if (res.status === 401) { handleUnauth(); openModal(); return }
+    // 202 — polling picks up the real status
   }
 
-  async function startGuidedCoverLetter() {
+  async function runCoverLetterRevise(feedback) {
     if (locked) { openModal(); return }
-    setActionLoading(true)
-    try {
-      const res = await apiFetch(`/jobs/${selectedJobId}/cover-letter`, {
-        method: 'POST',
-        body: JSON.stringify({ mode: 'guided', conversation_history: [] }),
-      })
-      if (res.status === 401) { handleUnauth(); openModal(); return }
-      const data = await res.json()
-      setOutputPanel({ type: 'cover-letter-guided', content: data.draft, history: data.conversation_history })
-      setGuidedFeedback('')
-    } finally {
-      setActionLoading(false)
-    }
-  }
 
-  async function reviseGuidedCoverLetter() {
-    if (!outputPanel?.history || !guidedFeedback) return
-    setActionLoading(true)
+    setJobDetail(prev => prev ? {
+      ...prev,
+      cover_letter: {
+        status: 'generating',
+        pdf_url: null,
+        started_at: new Date().toISOString(),
+        error: null,
+      }
+    } : prev)
+
     try {
       const res = await apiFetch(`/jobs/${selectedJobId}/cover-letter`, {
         method: 'POST',
-        body: JSON.stringify({
-          mode: 'guided',
-          feedback: guidedFeedback,
-          conversation_history: outputPanel.history,
-        }),
+        body: JSON.stringify({ mode: 'revise', feedback }),
       })
       if (res.status === 401) { handleUnauth(); openModal(); return }
-      const data = await res.json()
-      setOutputPanel({ type: 'cover-letter-guided', content: data.draft, history: data.conversation_history })
-      setGuidedFeedback('')
-    } finally {
-      setActionLoading(false)
+      // 202 — polling picks up the real status
+    } catch {
+      setJobDetail(prev => prev ? {
+        ...prev,
+        cover_letter: {
+          ...prev.cover_letter,
+          status: 'failed',
+          error: 'Failed to submit revision request. Please try again.',
+        }
+      } : prev)
     }
   }
 
@@ -676,18 +833,10 @@ export default function Dashboard() {
                       <button
                         className={locked ? 'db-btn db-btn--locked' : 'db-btn db-btn--secondary'}
                         onClick={locked ? openModal : runCoverLetter}
-                        disabled={actionLoading}
+                        disabled={jobDetail.cover_letter?.status === 'generating'}
                         type="button"
                       >
                         Cover letter
-                      </button>
-                      <button
-                        className={locked ? 'db-btn db-btn--locked' : 'db-btn db-btn--secondary'}
-                        onClick={locked ? openModal : startGuidedCoverLetter}
-                        disabled={actionLoading}
-                        type="button"
-                      >
-                        Cover letter guided
                       </button>
                     </div>
 
@@ -762,29 +911,15 @@ export default function Dashboard() {
                   )}
 
                   {/* Output panel — cover letter */}
-                  {(outputPanel?.type === 'cover-letter' || outputPanel?.type === 'cover-letter-guided') && (
-                    <div className="db-card">
-                      <span className="db-section-label">Cover letter</span>
-                      <pre className="db-output-pre">{outputPanel.content}</pre>
-                      {outputPanel.type === 'cover-letter-guided' && (
-                        <div className="db-guided">
-                          <textarea
-                            className="db-guided__textarea"
-                            placeholder="Feedback for revision…"
-                            value={guidedFeedback}
-                            onChange={e => setGuidedFeedback(e.target.value)}
-                          />
-                          <button
-                            className="db-btn db-btn--secondary"
-                            type="button"
-                            onClick={reviseGuidedCoverLetter}
-                            disabled={actionLoading || !guidedFeedback}
-                          >
-                            Revise
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                  {jobDetail.cover_letter && jobDetail.cover_letter.status !== 'none' && (
+                    <CoverLetterOutputPanel
+                      status={jobDetail.cover_letter.status}
+                      pdfUrl={jobDetail.cover_letter.pdf_url}
+                      startedAt={jobDetail.cover_letter.started_at}
+                      error={jobDetail.cover_letter.error}
+                      onRegenerate={runCoverLetter}
+                      onRevise={runCoverLetterRevise}
+                    />
                   )}
                 </div>
 
