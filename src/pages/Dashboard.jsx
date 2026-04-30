@@ -687,7 +687,7 @@ export default function Dashboard() {
                 value={pinInput}
                 onChange={e => setPinInput(e.target.value)}
                 autoFocus
-                placeholder="••••"
+                placeholder="Enter PIN to unlock"
               />
               <button className="db-modal__submit" type="submit" disabled={pinLoading}>
                 {pinLoading ? 'Checking…' : 'Unlock'}
