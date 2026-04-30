@@ -912,23 +912,25 @@
   width: 100%;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   gap: 0.75rem;
 }
 
 .db-modal__input {
-  width: 160px;
-  height: 40px;
-  text-align: center;
-  font-family: 'Courier New', monospace;
-  font-size: 1.2rem;
-  letter-spacing: 0.25em;
+  width: 100%;
+  height: 38px;
+  padding: 0 0.75rem;
+  text-align: left;
+  font-family: inherit;
+  font-size: 0.84rem;
+  letter-spacing: normal;
   background: var(--color-bg-subtle);
   border: 0.5px solid var(--color-border);
   border-radius: 8px;
   color: var(--color-text-primary);
   outline: none;
   transition: border-color 0.15s;
+  box-sizing: border-box;
 }
 
 .db-modal__input:focus {
@@ -936,7 +938,7 @@
 }
 
 .db-modal__submit {
-  width: 160px;
+  width: 100%;
   height: 38px;
   background: var(--color-accent);
   color: #111;
@@ -1184,4 +1186,41 @@
   font-size: 0.84rem;
   color: var(--color-text-muted);
   padding: 2rem 0;
+}
+
+
+/* ─── Spinner ─────────────────────────────────── */
+
+@keyframes db-spin {
+  to { transform: rotate(360deg); }
+}
+
+.db-spinner {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: db-spin 0.55s linear infinite;
+  margin-right: 0.4rem;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+
+/* ─── Lock button (nav slot, unlocked state) ──── */
+
+.db-lock-btn {
+  height: 26px;
+  padding: 0 0.65rem;
+  font-size: 0.74rem;
+}
+
+
+/* ─── Fit score not-available variant ─────────── */
+
+.db-fit-reasoning--na {
+  color: var(--color-text-muted);
+  font-style: italic;
 }

@@ -47,11 +47,12 @@ function ScoreBadge({ score, onLockClick }) {
 
 function StatusPill({ status }) {
   const slug = (status || 'unknown').toLowerCase().replace(/\s+/g, '-')
-  return <span className={`db-status-pill db-status-pill--${slug}`}>{status || '—'}</span>
+  return <span className={`db-status-pill db-status-pill--${slug}`}>{status || '-'}</span>
 }
 
 function ResumeOutputPanel({ status, pdfUrl, startedAt, error, onRegenerate }) {
   const [elapsed, setElapsed] = useState(0)
+  const [pendingRegen, setPendingRegen] = useState(false)
 
   useEffect(() => {
     if (status !== 'generating') {
@@ -65,6 +66,10 @@ function ResumeOutputPanel({ status, pdfUrl, startedAt, error, onRegenerate }) {
     }, 1000)
     return () => clearInterval(interval)
   }, [status, startedAt])
+
+  useEffect(() => {
+    if (status !== 'done') setPendingRegen(false)
+  }, [status])
 
   if (status === 'generating') {
     return (
@@ -84,7 +89,13 @@ function ResumeOutputPanel({ status, pdfUrl, startedAt, error, onRegenerate }) {
         <div className="db-resume-panel__header">
           <span className="db-section-label db-section-label--inline">Tailored resume</span>
           <div className="db-resume-panel__actions">
-            <button className="db-btn db-btn--secondary" type="button" onClick={onRegenerate} disabled={status === 'generating'}>
+            <button
+              className="db-btn db-btn--secondary"
+              type="button"
+              onClick={() => { setPendingRegen(true); onRegenerate() }}
+              disabled={pendingRegen}
+            >
+              {pendingRegen && <span className="db-spinner" aria-hidden="true" />}
               Regenerate
             </button>
             <a href={pdfUrl} download className="db-btn db-btn--accent">
@@ -108,7 +119,7 @@ function ResumeOutputPanel({ status, pdfUrl, startedAt, error, onRegenerate }) {
         <div className="db-resume-panel__error">
           <span className="db-section-label">Resume generation failed</span>
           {error && <p className="db-resume-panel__error-text">{error}</p>}
-          <button className="db-btn db-btn--accent" type="button" onClick={onRegenerate} disabled={status === 'generating'}>
+          <button className="db-btn db-btn--accent" type="button" onClick={onRegenerate}>
             Retry
           </button>
         </div>
@@ -119,25 +130,16 @@ function ResumeOutputPanel({ status, pdfUrl, startedAt, error, onRegenerate }) {
   return null
 }
 
-function RevisionFeedbackModal({ open, onClose, onSubmit }) {
-  const [feedback, setFeedback] = useState('')
+function Modal({ title, onClose, buttons, children }) {
   const modalRef = useRef(null)
 
   useEffect(() => {
-    if (open) setFeedback('')
-  }, [open])
-
-  useEffect(() => {
-    if (!open) return
-    function handleEsc(e) {
-      if (e.key === 'Escape') onClose()
-    }
+    function handleEsc(e) { if (e.key === 'Escape') onClose() }
     document.addEventListener('keydown', handleEsc)
     return () => document.removeEventListener('keydown', handleEsc)
-  }, [open, onClose])
+  }, [onClose])
 
   useEffect(() => {
-    if (!open) return
     const modal = modalRef.current
     if (!modal) return
     const focusable = modal.querySelectorAll('button, textarea, input, [tabindex]:not([tabindex="-1"])')
@@ -153,43 +155,80 @@ function RevisionFeedbackModal({ open, onClose, onSubmit }) {
     }
     document.addEventListener('keydown', trapFocus)
     return () => document.removeEventListener('keydown', trapFocus)
-  }, [open])
-
-  if (!open) return null
+  }, [])
 
   return (
     <div className="db-modal-scrim" onClick={onClose}>
       <div className="db-modal db-modal--wide" ref={modalRef} onClick={e => e.stopPropagation()}>
-        <h2 className="db-modal__heading">Request revision</h2>
-        <textarea
-          className="db-modal__textarea"
-          autoFocus
-          value={feedback}
-          onChange={e => setFeedback(e.target.value)}
-          placeholder="What would you like to change about this cover letter? Be specific about which paragraphs or what aspects need adjustment."
-          rows={7}
-        />
+        <h2 className="db-modal__heading">{title}</h2>
+        {children}
         <div className="db-modal__footer">
-          <button className="db-btn db-btn--secondary" type="button" onClick={onClose}>
-            Cancel
-          </button>
-          <button
-            className="db-btn db-btn--accent"
-            type="button"
-            disabled={!feedback.trim()}
-            onClick={() => { onSubmit(feedback); onClose() }}
-          >
-            Request revision
-          </button>
+          {buttons.map((btn, i) => (
+            <button
+              key={i}
+              className={`db-btn db-btn--${btn.variant}`}
+              type="button"
+              disabled={btn.disabled}
+              onClick={btn.onClick}
+              autoFocus={btn.autoFocus}
+            >
+              {btn.label}
+            </button>
+          ))}
         </div>
       </div>
     </div>
   )
 }
 
+function RevisionFeedbackModal({ onClose, onSubmit }) {
+  const [feedback, setFeedback] = useState('')
+
+  return (
+    <Modal
+      title="Request revision"
+      onClose={onClose}
+      buttons={[
+        { label: 'Cancel', variant: 'secondary', onClick: onClose },
+        {
+          label: 'Request revision',
+          variant: 'accent',
+          disabled: !feedback.trim(),
+          onClick: () => { onSubmit(feedback); onClose() },
+        },
+      ]}
+    >
+      <textarea
+        className="db-modal__textarea"
+        autoFocus
+        value={feedback}
+        onChange={e => setFeedback(e.target.value)}
+        placeholder="What would you like to change about this cover letter? Be specific about which paragraphs or what aspects need adjustment."
+        rows={7}
+      />
+    </Modal>
+  )
+}
+
+function LockConfirmModal({ onClose, onConfirm }) {
+  return (
+    <Modal
+      title="Lock the dashboard?"
+      onClose={onClose}
+      buttons={[
+        { label: 'Cancel', variant: 'secondary', onClick: onClose, autoFocus: true },
+        { label: 'Lock', variant: 'accent', onClick: onConfirm },
+      ]}
+    >
+      <p className="db-modal__sub">You'll need to enter your PIN to unlock again.</p>
+    </Modal>
+  )
+}
+
 function CoverLetterOutputPanel({ status, pdfUrl, startedAt, error, onRegenerate, onRevise }) {
   const [elapsed, setElapsed] = useState(0)
   const [revisionModalOpen, setRevisionModalOpen] = useState(false)
+  const [pendingRegen, setPendingRegen] = useState(false)
 
   useEffect(() => {
     if (status !== 'generating') {
@@ -203,6 +242,10 @@ function CoverLetterOutputPanel({ status, pdfUrl, startedAt, error, onRegenerate
     }, 1000)
     return () => clearInterval(interval)
   }, [status, startedAt])
+
+  useEffect(() => {
+    if (status !== 'done') setPendingRegen(false)
+  }, [status])
 
   if (status === 'generating') {
     return (
@@ -226,7 +269,13 @@ function CoverLetterOutputPanel({ status, pdfUrl, startedAt, error, onRegenerate
               <button className="db-btn db-btn--secondary" type="button" onClick={() => setRevisionModalOpen(true)}>
                 Revise
               </button>
-              <button className="db-btn db-btn--secondary" type="button" onClick={onRegenerate}>
+              <button
+                className="db-btn db-btn--secondary"
+                type="button"
+                onClick={() => { setPendingRegen(true); onRegenerate() }}
+                disabled={pendingRegen}
+              >
+                {pendingRegen && <span className="db-spinner" aria-hidden="true" />}
                 Regenerate
               </button>
               <a href={pdfUrl} download className="db-btn db-btn--accent">
@@ -248,11 +297,12 @@ function CoverLetterOutputPanel({ status, pdfUrl, startedAt, error, onRegenerate
             Open PDF →
           </a>
         </div>
-        <RevisionFeedbackModal
-          open={revisionModalOpen}
-          onClose={() => setRevisionModalOpen(false)}
-          onSubmit={feedback => onRevise(feedback)}
-        />
+        {revisionModalOpen && (
+          <RevisionFeedbackModal
+            onClose={() => setRevisionModalOpen(false)}
+            onSubmit={feedback => onRevise(feedback)}
+          />
+        )}
       </>
     )
   }
@@ -282,6 +332,7 @@ export default function Dashboard() {
   const [pinInput, setPinInput] = useState('')
   const [pinError, setPinError] = useState('')
   const [pinLoading, setPinLoading] = useState(false)
+  const [lockModalOpen, setLockModalOpen] = useState(false)
 
   const [view, setView] = useState('list')
   const [selectedJobId, setSelectedJobId] = useState(null)
@@ -442,6 +493,12 @@ export default function Dashboard() {
     setPinError('')
   }
 
+  function handleLock() {
+    clearSession()
+    setLocked(true)
+    setLockModalOpen(false)
+  }
+
   async function submitPin(e) {
     e.preventDefault()
     setPinLoading(true)
@@ -592,14 +649,22 @@ export default function Dashboard() {
     return req.requirement || req.skill || req.text || ''
   }
 
-  const PinPill = (
+  const PinPill = locked ? (
     <button
-      className={`db-pin-pill ${locked ? 'db-pin-pill--locked' : 'db-pin-pill--unlocked'}`}
-      onClick={locked ? openModal : undefined}
-      aria-label={locked ? 'Locked — click to unlock' : 'Session unlocked'}
+      className="db-pin-pill db-pin-pill--locked"
+      onClick={openModal}
+      aria-label="Locked. Click to unlock"
       type="button"
     >
       <span className="db-pin-pill__dot" />
+    </button>
+  ) : (
+    <button
+      className="db-btn db-btn--secondary db-lock-btn"
+      onClick={() => setLockModalOpen(true)}
+      type="button"
+    >
+      Lock
     </button>
   )
 
@@ -612,7 +677,7 @@ export default function Dashboard() {
           <div className="db-modal" onClick={e => e.stopPropagation()}>
             <h2 className="db-modal__heading">Enter PIN</h2>
             <p className="db-modal__sub">
-              Unlock to run AI actions — scraping, resume tailoring, and cover letter generation.
+              Unlock to run AI actions: scraping, resume tailoring, and cover letter generation.
             </p>
             {pinError && <p className="db-modal__error">{pinError}</p>}
             <form onSubmit={submitPin}>
@@ -629,10 +694,17 @@ export default function Dashboard() {
               </button>
             </form>
             <button className="db-modal__cancel" type="button" onClick={closeModal}>
-              Cancel — continue browsing
+              Cancel
             </button>
           </div>
         </div>
+      )}
+
+      {lockModalOpen && (
+        <LockConfirmModal
+          onClose={() => setLockModalOpen(false)}
+          onConfirm={handleLock}
+        />
       )}
 
       <div className="dashboard__inner">
@@ -641,9 +713,9 @@ export default function Dashboard() {
         {view === 'list' && (
           <>
             <nav className="db-breadcrumb" aria-label="Breadcrumb">
-              <span className="db-breadcrumb__item">Projects</span>
+              <Link to="/projects" className="db-breadcrumb__link">Projects</Link>
               <span className="db-breadcrumb__sep">/</span>
-              <span className="db-breadcrumb__item">Job hunt</span>
+              <Link to="/projects/job-hunt" className="db-breadcrumb__link">Job hunt</Link>
               <span className="db-breadcrumb__sep">/</span>
               <span className="db-breadcrumb__item">Dashboard</span>
             </nav>
@@ -822,20 +894,24 @@ export default function Dashboard() {
                     </div>
 
                     <div className="db-actions">
-                      <button
-                        className={locked ? 'db-btn db-btn--locked' : 'db-btn db-btn--accent'}
-                        onClick={locked ? openModal : runResume}
-                        disabled={jobDetail.resume?.status === 'generating'}
-                        type="button"
-                      >
-                        Tailor resume
-                      </button>
+                      {!locked && (
+                        <button
+                          className="db-btn db-btn--accent"
+                          onClick={runResume}
+                          disabled={jobDetail.resume?.status === 'generating'}
+                          type="button"
+                        >
+                          {jobDetail.resume?.status === 'generating' && <span className="db-spinner" aria-hidden="true" />}
+                          Tailor resume
+                        </button>
+                      )}
                       <button
                         className={locked ? 'db-btn db-btn--locked' : 'db-btn db-btn--secondary'}
                         onClick={locked ? openModal : runCoverLetter}
                         disabled={jobDetail.cover_letter?.status === 'generating'}
                         type="button"
                       >
+                        {!locked && jobDetail.cover_letter?.status === 'generating' && <span className="db-spinner" aria-hidden="true" />}
                         Cover letter
                       </button>
                     </div>
@@ -900,7 +976,7 @@ export default function Dashboard() {
                   )}
 
                   {/* Output panel — resume */}
-                  {jobDetail.resume && jobDetail.resume.status !== 'none' && (
+                  {!locked && jobDetail.resume && jobDetail.resume.status !== 'none' && (
                     <ResumeOutputPanel
                       status={jobDetail.resume.status}
                       pdfUrl={jobDetail.resume.pdf_url}
@@ -928,15 +1004,7 @@ export default function Dashboard() {
                   <div className="db-card">
                     <span className="db-section-label">Company</span>
 
-                    {jobDetail.company?.candidate_fit_score != null ? (
-                      <div className="db-fit-block">
-                        <span className="db-fit-score">{jobDetail.company.candidate_fit_score}</span>
-                        <span className="db-fit-label">Candidate fit</span>
-                        {jobDetail.company.candidate_fit_reasoning && (
-                          <p className="db-fit-reasoning">{jobDetail.company.candidate_fit_reasoning}</p>
-                        )}
-                      </div>
-                    ) : (
+                    {locked ? (
                       <div
                         className="db-locked-placeholder"
                         onClick={openModal}
@@ -948,7 +1016,20 @@ export default function Dashboard() {
                           <rect x="3" y="6" width="8" height="7" rx="1.5" fill="currentColor" opacity=".4"/>
                           <path d="M4.5 6V4a2.5 2.5 0 0 1 5 0v2" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" fill="none"/>
                         </svg>
-                        <span>Fit score hidden — unlock to view</span>
+                        <span>Unlock to view company information</span>
+                      </div>
+                    ) : jobDetail.company?.candidate_fit_score != null ? (
+                      <div className="db-fit-block">
+                        <span className="db-fit-score">{jobDetail.company.candidate_fit_score}</span>
+                        <span className="db-fit-label">Candidate fit</span>
+                        {jobDetail.company.candidate_fit_reasoning && (
+                          <p className="db-fit-reasoning">{jobDetail.company.candidate_fit_reasoning}</p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="db-fit-block">
+                        <span className="db-fit-label">Candidate fit</span>
+                        <p className="db-fit-reasoning db-fit-reasoning--na">Not available</p>
                       </div>
                     )}
 
