@@ -1107,6 +1107,25 @@
   line-height: 1.5;
 }
 
+.db-resume-panel__locked {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 2.5rem 1rem;
+  border: 0.5px dashed var(--color-border);
+  border-radius: 6px;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.db-resume-panel__locked:hover {
+  border-color: var(--color-accent);
+  color: var(--color-text-secondary);
+}
+
 
 /* ─── Resume output panel (legacy, kept for reference) ── */
 

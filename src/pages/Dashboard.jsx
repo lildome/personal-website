@@ -50,7 +50,7 @@ function StatusPill({ status }) {
   return <span className={`db-status-pill db-status-pill--${slug}`}>{status || '-'}</span>
 }
 
-function ResumeOutputPanel({ status, pdfUrl, startedAt, error, onRegenerate }) {
+function ResumeOutputPanel({ status, pdfUrl, startedAt, error, onRegenerate, locked, onLockClick }) {
   const [elapsed, setElapsed] = useState(0)
   const [pendingRegen, setPendingRegen] = useState(false)
 
@@ -78,6 +78,29 @@ function ResumeOutputPanel({ status, pdfUrl, startedAt, error, onRegenerate }) {
           <span className="db-resume-panel__progress-text">
             Generating resume... {elapsed}s
           </span>
+        </div>
+      </div>
+    )
+  }
+
+  if (status === 'done' && locked) {
+    return (
+      <div className="db-resume-panel">
+        <div className="db-resume-panel__header">
+          <span className="db-section-label db-section-label--inline">Tailored resume</span>
+        </div>
+        <div
+          className="db-resume-panel__locked"
+          onClick={onLockClick}
+          role="button"
+          tabIndex={0}
+          onKeyDown={e => e.key === 'Enter' && onLockClick()}
+        >
+          <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+            <rect x="3" y="6" width="8" height="7" rx="1.5" fill="currentColor" opacity=".4"/>
+            <path d="M4.5 6V4a2.5 2.5 0 0 1 5 0v2" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" fill="none"/>
+          </svg>
+          <span>Unlock to view tailored resume</span>
         </div>
       </div>
     )
@@ -225,7 +248,7 @@ function LockConfirmModal({ onClose, onConfirm }) {
   )
 }
 
-function CoverLetterOutputPanel({ status, pdfUrl, startedAt, error, onRegenerate, onRevise }) {
+function CoverLetterOutputPanel({ status, pdfUrl, startedAt, error, onRegenerate, onRevise, locked, onLockClick }) {
   const [elapsed, setElapsed] = useState(0)
   const [revisionModalOpen, setRevisionModalOpen] = useState(false)
   const [pendingRegen, setPendingRegen] = useState(false)
@@ -254,6 +277,29 @@ function CoverLetterOutputPanel({ status, pdfUrl, startedAt, error, onRegenerate
           <span className="db-resume-panel__progress-text">
             Generating cover letter... {elapsed}s
           </span>
+        </div>
+      </div>
+    )
+  }
+
+  if (status === 'done' && locked) {
+    return (
+      <div className="db-resume-panel">
+        <div className="db-resume-panel__header">
+          <span className="db-section-label db-section-label--inline">Cover letter</span>
+        </div>
+        <div
+          className="db-resume-panel__locked"
+          onClick={onLockClick}
+          role="button"
+          tabIndex={0}
+          onKeyDown={e => e.key === 'Enter' && onLockClick()}
+        >
+          <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+            <rect x="3" y="6" width="8" height="7" rx="1.5" fill="currentColor" opacity=".4"/>
+            <path d="M4.5 6V4a2.5 2.5 0 0 1 5 0v2" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" fill="none"/>
+          </svg>
+          <span>Unlock to view cover letter</span>
         </div>
       </div>
     )
@@ -894,33 +940,25 @@ export default function Dashboard() {
                     </div>
 
                     <div className="db-actions">
-                      {!locked && (
-                        <button
-                          className="db-btn db-btn--accent"
-                          onClick={runResume}
-                          disabled={jobDetail.resume?.status === 'generating'}
-                          type="button"
-                        >
-                          {jobDetail.resume?.status === 'generating' && <span className="db-spinner" aria-hidden="true" />}
-                          Tailor resume
-                        </button>
-                      )}
+                      <button
+                        className={locked ? 'db-btn db-btn--locked' : 'db-btn db-btn--accent'}
+                        onClick={locked ? undefined : runResume}
+                        disabled={locked || jobDetail.resume?.status === 'generating'}
+                        type="button"
+                      >
+                        {!locked && jobDetail.resume?.status === 'generating' && <span className="db-spinner" aria-hidden="true" />}
+                        Tailor resume
+                      </button>
                       <button
                         className={locked ? 'db-btn db-btn--locked' : 'db-btn db-btn--secondary'}
-                        onClick={locked ? openModal : runCoverLetter}
-                        disabled={jobDetail.cover_letter?.status === 'generating'}
+                        onClick={locked ? undefined : runCoverLetter}
+                        disabled={locked || jobDetail.cover_letter?.status === 'generating'}
                         type="button"
                       >
                         {!locked && jobDetail.cover_letter?.status === 'generating' && <span className="db-spinner" aria-hidden="true" />}
                         Cover letter
                       </button>
                     </div>
-
-                    {locked && (
-                      <p className="db-locked-note">
-                        Unlock with PIN to tailor resume and generate cover letters.
-                      </p>
-                    )}
                   </div>
 
                   {/* Job summary card */}
@@ -976,8 +1014,10 @@ export default function Dashboard() {
                   )}
 
                   {/* Output panel — resume */}
-                  {!locked && jobDetail.resume && jobDetail.resume.status !== 'none' && (
+                  {jobDetail.resume && jobDetail.resume.status !== 'none' && (
                     <ResumeOutputPanel
+                      locked={locked}
+                      onLockClick={openModal}
                       status={jobDetail.resume.status}
                       pdfUrl={jobDetail.resume.pdf_url}
                       startedAt={jobDetail.resume.started_at}
@@ -989,6 +1029,8 @@ export default function Dashboard() {
                   {/* Output panel — cover letter */}
                   {jobDetail.cover_letter && jobDetail.cover_letter.status !== 'none' && (
                     <CoverLetterOutputPanel
+                      locked={locked}
+                      onLockClick={openModal}
                       status={jobDetail.cover_letter.status}
                       pdfUrl={jobDetail.cover_letter.pdf_url}
                       startedAt={jobDetail.cover_letter.started_at}
