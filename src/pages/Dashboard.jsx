@@ -1018,39 +1018,43 @@ export default function Dashboard() {
                         </svg>
                         <span>Unlock to view company information</span>
                       </div>
-                    ) : jobDetail.company?.candidate_fit_score != null ? (
-                      <div className="db-fit-block">
-                        <span className="db-fit-score">{jobDetail.company.candidate_fit_score}</span>
-                        <span className="db-fit-label">Candidate fit</span>
-                        {jobDetail.company.candidate_fit_reasoning && (
-                          <p className="db-fit-reasoning">{jobDetail.company.candidate_fit_reasoning}</p>
-                        )}
-                      </div>
                     ) : (
-                      <div className="db-fit-block">
-                        <span className="db-fit-label">Candidate fit</span>
-                        <p className="db-fit-reasoning db-fit-reasoning--na">Not available</p>
-                      </div>
-                    )}
+                      <>
+                        {jobDetail.company?.candidate_fit_score != null ? (
+                          <div className="db-fit-block">
+                            <span className="db-fit-score">{jobDetail.company.candidate_fit_score}</span>
+                            <span className="db-fit-label">Candidate fit</span>
+                            {jobDetail.company.candidate_fit_reasoning && (
+                              <p className="db-fit-reasoning">{jobDetail.company.candidate_fit_reasoning}</p>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="db-fit-block">
+                            <span className="db-fit-label">Candidate fit</span>
+                            <p className="db-fit-reasoning db-fit-reasoning--na">Not available</p>
+                          </div>
+                        )}
 
-                    {jobDetail.company?.summary && (
-                      <p className="db-company-summary">{jobDetail.company.summary}</p>
-                    )}
+                        {jobDetail.company?.summary && (
+                          <p className="db-company-summary">{jobDetail.company.summary}</p>
+                        )}
 
-                    {jobDetail.company?.culture_notes && (
-                      <div className="db-culture-block">
-                        <span className="db-section-label">Culture</span>
-                        <p className="db-culture-text">{jobDetail.company.culture_notes}</p>
-                      </div>
-                    )}
+                        {jobDetail.company?.culture_notes && (
+                          <div className="db-culture-block">
+                            <span className="db-section-label">Culture</span>
+                            <p className="db-culture-text">{jobDetail.company.culture_notes}</p>
+                          </div>
+                        )}
 
-                    {jobDetail.company?.recent_news &&
-                      jobDetail.company.recent_news !== 'N/A' && (
-                        <div className="db-news-block">
-                          <span className="db-section-label">Recent news</span>
-                          <p className="db-news-text">{jobDetail.company.recent_news}</p>
-                        </div>
-                      )}
+                        {jobDetail.company?.recent_news &&
+                          jobDetail.company.recent_news !== 'N/A' && (
+                            <div className="db-news-block">
+                              <span className="db-section-label">Recent news</span>
+                              <p className="db-news-text">{jobDetail.company.recent_news}</p>
+                            </div>
+                          )}
+                      </>
+                    )}
                   </div>
                 </aside>
               </div>
