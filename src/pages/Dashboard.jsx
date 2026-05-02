@@ -5,6 +5,13 @@ import './Dashboard.css'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL
 
+const TIME_FILTER_MS = {
+  day: 24 * 60 * 60 * 1000,
+  '3days': 3 * 24 * 60 * 60 * 1000,
+  week: 7 * 24 * 60 * 60 * 1000,
+  month: 30 * 24 * 60 * 60 * 1000,
+}
+
 function getToken() {
   return localStorage.getItem('dashboard_token')
 }
@@ -389,7 +396,7 @@ export default function Dashboard() {
   const [detailLoading, setDetailLoading] = useState(false)
 
   const [statusFilter, setStatusFilter] = useState('')
-  const [minScore, setMinScore] = useState('')
+  const [timeFilter, setTimeFilter] = useState('')
 
   const [scrapeSource, setScrapeSource] = useState('indeed')
   const [indeedForm, setIndeedForm] = useState({ keywords: '', location: '', country: 'US', maxItems: 25 })
@@ -715,7 +722,10 @@ export default function Dashboard() {
 
   const filteredJobs = jobs.filter(j => {
     if (statusFilter && j.status !== statusFilter) return false
-    if (minScore !== '' && j.match_score != null && j.match_score < Number(minScore)) return false
+    if (timeFilter) {
+      const cutoff = Date.now() - TIME_FILTER_MS[timeFilter]
+      if (!j.scrapedAt || new Date(j.scrapedAt).getTime() < cutoff) return false
+    }
     return true
   })
 
@@ -809,6 +819,17 @@ export default function Dashboard() {
               <div className="db-toolbar__right">
                 <select
                   className="db-filter-select"
+                  value={timeFilter}
+                  onChange={e => setTimeFilter(e.target.value)}
+                >
+                  <option value="">All time</option>
+                  <option value="day">Past day</option>
+                  <option value="3days">Past 3 days</option>
+                  <option value="week">Past week</option>
+                  <option value="month">Past month</option>
+                </select>
+                <select
+                  className="db-filter-select"
                   value={statusFilter}
                   onChange={e => setStatusFilter(e.target.value)}
                 >
@@ -820,17 +841,6 @@ export default function Dashboard() {
                   <option value="rejected">Rejected</option>
                   <option value="archived">Archived</option>
                 </select>
-                <input
-                  className={`db-filter-input${locked ? ' f-input--locked' : ''}`}
-                  type="number"
-                  min="0"
-                  max="10"
-                  placeholder="Min score"
-                  value={minScore}
-                  onChange={e => setMinScore(e.target.value)}
-                  disabled={locked}
-                  title={locked ? 'Unlock to filter by score' : undefined}
-                />
                 <button className="db-btn db-btn--secondary" onClick={loadJobs} disabled={loading}>
                   {loading ? '…' : 'Refresh'}
                 </button>
