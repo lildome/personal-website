@@ -50,7 +50,7 @@ function StatusPill({ status }) {
   return <span className={`db-status-pill db-status-pill--${slug}`}>{status || '-'}</span>
 }
 
-function ResumeOutputPanel({ status, pdfUrl, startedAt, error, onRegenerate, locked, onLockClick }) {
+function ResumeOutputPanel({ status, pdfUrl, startedAt, error, onRegenerate, onDownload, locked, onLockClick }) {
   const [elapsed, setElapsed] = useState(0)
   const [pendingRegen, setPendingRegen] = useState(false)
 
@@ -121,9 +121,9 @@ function ResumeOutputPanel({ status, pdfUrl, startedAt, error, onRegenerate, loc
               {pendingRegen && <span className="db-spinner" aria-hidden="true" />}
               Regenerate
             </button>
-            <a href={pdfUrl} download className="db-btn db-btn--accent">
+            <button className="db-btn db-btn--accent" type="button" onClick={onDownload}>
               Download PDF
-            </a>
+            </button>
           </div>
         </div>
         <iframe
@@ -248,7 +248,7 @@ function LockConfirmModal({ onClose, onConfirm }) {
   )
 }
 
-function CoverLetterOutputPanel({ status, pdfUrl, startedAt, error, onRegenerate, onRevise, locked, onLockClick }) {
+function CoverLetterOutputPanel({ status, pdfUrl, startedAt, error, onRegenerate, onRevise, onDownload, locked, onLockClick }) {
   const [elapsed, setElapsed] = useState(0)
   const [revisionModalOpen, setRevisionModalOpen] = useState(false)
   const [pendingRegen, setPendingRegen] = useState(false)
@@ -324,9 +324,9 @@ function CoverLetterOutputPanel({ status, pdfUrl, startedAt, error, onRegenerate
                 {pendingRegen && <span className="db-spinner" aria-hidden="true" />}
                 Regenerate
               </button>
-              <a href={pdfUrl} download className="db-btn db-btn--accent">
+              <button className="db-btn db-btn--accent" type="button" onClick={onDownload}>
                 Download PDF
-              </a>
+              </button>
             </div>
           </div>
           <iframe
@@ -656,6 +656,13 @@ export default function Dashboard() {
         }
       } : prev)
     }
+  }
+
+  async function downloadPdf(jobId, type) {
+    const res = await apiFetch(`/jobs/${jobId}/${type}/download`)
+    if (res.status === 401) { handleUnauth(); openModal(); return }
+    const { url } = await res.json()
+    window.location.href = url
   }
 
   async function submitScrape(e) {
@@ -1023,6 +1030,7 @@ export default function Dashboard() {
                       startedAt={jobDetail.resume.started_at}
                       error={jobDetail.resume.error}
                       onRegenerate={runResume}
+                      onDownload={() => downloadPdf(selectedJobId, 'resume')}
                     />
                   )}
 
@@ -1037,6 +1045,7 @@ export default function Dashboard() {
                       error={jobDetail.cover_letter.error}
                       onRegenerate={runCoverLetter}
                       onRevise={runCoverLetterRevise}
+                      onDownload={() => downloadPdf(selectedJobId, 'cover-letter')}
                     />
                   )}
                 </div>
