@@ -975,8 +975,18 @@ export default function Dashboard() {
                     </div>
 
                     <div className="db-actions">
+                      {jobDetail.job.url && (
+                        <a
+                          className="db-btn db-btn--accent"
+                          href={jobDetail.job.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          View listing ↗
+                        </a>
+                      )}
                       <button
-                        className={locked ? 'db-btn db-btn--locked' : 'db-btn db-btn--accent'}
+                        className={locked ? 'db-btn db-btn--locked' : 'db-btn db-btn--secondary'}
                         onClick={locked ? undefined : runResume}
                         disabled={locked || jobDetail.resume?.status === 'generating'}
                         type="button"
