@@ -391,7 +391,9 @@ export default function Dashboard() {
   const [statusFilter, setStatusFilter] = useState('')
   const [minScore, setMinScore] = useState('')
 
-  const [scrapeForm, setScrapeForm] = useState({ position: '', location: '', country: 'US', maxItems: 25 })
+  const [scrapeSource, setScrapeSource] = useState('indeed')
+  const [indeedForm, setIndeedForm] = useState({ keywords: '', location: '', country: 'US', maxItems: 25 })
+  const [linkedinForm, setLinkedinForm] = useState({ keywords: '', location: '', remote: '', posted_within: '', count: 50 })
   const [scrapeSuccess, setScrapeSuccess] = useState(false)
   const [scrapeLoading, setScrapeLoading] = useState(false)
 
@@ -665,20 +667,46 @@ export default function Dashboard() {
     window.location.href = url
   }
 
+  function switchSource(newSource) {
+    if (newSource === scrapeSource) return
+    const currentForm = scrapeSource === 'indeed' ? indeedForm : linkedinForm
+    const setNewForm = newSource === 'indeed' ? setIndeedForm : setLinkedinForm
+    setNewForm(prev => ({
+      ...prev,
+      keywords: currentForm.keywords,
+      location: currentForm.location,
+    }))
+    setScrapeSuccess(false)
+    setScrapeSource(newSource)
+  }
+
   async function submitScrape(e) {
     e.preventDefault()
     if (locked) { openModal(); return }
     setScrapeLoading(true)
     try {
-      await apiFetch('/scrape', {
-        method: 'POST',
-        body: JSON.stringify({
-          position: scrapeForm.position,
-          ...(scrapeForm.location ? { location: scrapeForm.location } : {}),
-          ...(scrapeForm.country ? { country: scrapeForm.country } : {}),
-          ...(scrapeForm.maxItems ? { maxItemsPerSearch: scrapeForm.maxItems } : {}),
-        }),
-      })
+      if (scrapeSource === 'indeed') {
+        await apiFetch('/scrape/indeed', {
+          method: 'POST',
+          body: JSON.stringify({
+            position: indeedForm.keywords,
+            ...(indeedForm.location ? { location: indeedForm.location } : {}),
+            ...(indeedForm.country ? { country: indeedForm.country } : {}),
+            ...(indeedForm.maxItems ? { maxItemsPerSearch: indeedForm.maxItems } : {}),
+          }),
+        })
+      } else {
+        await apiFetch('/scrape/linkedin', {
+          method: 'POST',
+          body: JSON.stringify({
+            keywords: linkedinForm.keywords,
+            location: linkedinForm.location,
+            ...(linkedinForm.remote ? { remote: linkedinForm.remote } : {}),
+            ...(linkedinForm.posted_within ? { posted_within: linkedinForm.posted_within } : {}),
+            ...(linkedinForm.count ? { count: linkedinForm.count } : {}),
+          }),
+        })
+      }
       setScrapeSuccess(true)
     } finally {
       setScrapeLoading(false)
@@ -1136,60 +1164,141 @@ export default function Dashboard() {
             <div className="db-search-wrap">
               <div className="db-card">
                 <h2 className="db-search-heading">Search for jobs</h2>
+                <div className="db-source-tabs">
+                  <button
+                    type="button"
+                    className={`db-source-tab${scrapeSource === 'indeed' ? ' db-source-tab--active' : ''}`}
+                    onClick={() => switchSource('indeed')}
+                  >
+                    Indeed
+                  </button>
+                  <button
+                    type="button"
+                    className={`db-source-tab${scrapeSource === 'linkedin' ? ' db-source-tab--active' : ''}`}
+                    onClick={() => switchSource('linkedin')}
+                  >
+                    LinkedIn
+                  </button>
+                </div>
                 <form className="db-search-form" onSubmit={submitScrape}>
-                  <div className="db-form-grid">
-                    <div className="db-form-field">
-                      <label className="db-form-label">Position / keywords</label>
-                      <input
-                        className="db-form-input"
-                        type="text"
-                        required
-                        value={scrapeForm.position}
-                        onChange={e => setScrapeForm(f => ({ ...f, position: e.target.value }))}
-                        placeholder="e.g. Software Engineer"
-                      />
+                  {scrapeSource === 'indeed' ? (
+                    <div className="db-form-grid">
+                      <div className="db-form-field">
+                        <label className="db-form-label">Keywords</label>
+                        <input
+                          className="db-form-input"
+                          type="text"
+                          required
+                          value={indeedForm.keywords}
+                          onChange={e => setIndeedForm(f => ({ ...f, keywords: e.target.value }))}
+                          placeholder="e.g. Software Engineer"
+                        />
+                      </div>
+                      <div className="db-form-field">
+                        <label className="db-form-label">Location</label>
+                        <input
+                          className="db-form-input"
+                          type="text"
+                          value={indeedForm.location}
+                          onChange={e => setIndeedForm(f => ({ ...f, location: e.target.value }))}
+                          placeholder="e.g. San Francisco"
+                        />
+                        <span className="db-form-hint">Type 'remote' to find remote positions.</span>
+                      </div>
+                      <div className="db-form-field">
+                        <label className="db-form-label">Country</label>
+                        <select
+                          className="db-form-select"
+                          value={indeedForm.country}
+                          onChange={e => setIndeedForm(f => ({ ...f, country: e.target.value }))}
+                        >
+                          <option value="US">United States</option>
+                          <option value="GB">United Kingdom</option>
+                          <option value="CA">Canada</option>
+                          <option value="AU">Australia</option>
+                          <option value="DE">Germany</option>
+                          <option value="FR">France</option>
+                          <option value="NL">Netherlands</option>
+                          <option value="SG">Singapore</option>
+                          <option value="IN">India</option>
+                        </select>
+                      </div>
+                      <div className="db-form-field">
+                        <label className="db-form-label">Max listings</label>
+                        <input
+                          className="db-form-input"
+                          type="number"
+                          min="1"
+                          max="100"
+                          value={indeedForm.maxItems}
+                          onChange={e => setIndeedForm(f => ({ ...f, maxItems: Number(e.target.value) }))}
+                        />
+                      </div>
                     </div>
-                    <div className="db-form-field">
-                      <label className="db-form-label">Location</label>
-                      <input
-                        className="db-form-input"
-                        type="text"
-                        value={scrapeForm.location}
-                        onChange={e => setScrapeForm(f => ({ ...f, location: e.target.value }))}
-                        placeholder="e.g. San Francisco"
-                      />
+                  ) : (
+                    <div className="db-form-grid">
+                      <div className="db-form-field">
+                        <label className="db-form-label">Keywords</label>
+                        <input
+                          className="db-form-input"
+                          type="text"
+                          required
+                          value={linkedinForm.keywords}
+                          onChange={e => setLinkedinForm(f => ({ ...f, keywords: e.target.value }))}
+                          placeholder="e.g. Software Engineer"
+                        />
+                      </div>
+                      <div className="db-form-field">
+                        <label className="db-form-label">Location</label>
+                        <input
+                          className="db-form-input"
+                          type="text"
+                          required
+                          value={linkedinForm.location}
+                          onChange={e => setLinkedinForm(f => ({ ...f, location: e.target.value }))}
+                          placeholder="e.g. Melbourne, Australia"
+                        />
+                      </div>
+                      <div className="db-form-field">
+                        <label className="db-form-label">Remote</label>
+                        <select
+                          className="db-form-select"
+                          value={linkedinForm.remote}
+                          onChange={e => setLinkedinForm(f => ({ ...f, remote: e.target.value }))}
+                        >
+                          <option value="">Any</option>
+                          <option value="onsite">On-site</option>
+                          <option value="remote">Remote</option>
+                          <option value="hybrid">Hybrid</option>
+                        </select>
+                      </div>
+                      <div className="db-form-field">
+                        <label className="db-form-label">Posted within</label>
+                        <select
+                          className="db-form-select"
+                          value={linkedinForm.posted_within}
+                          onChange={e => setLinkedinForm(f => ({ ...f, posted_within: e.target.value }))}
+                        >
+                          <option value="">Any</option>
+                          <option value="day">Last day</option>
+                          <option value="3days">Last 3 days</option>
+                          <option value="week">Last week</option>
+                          <option value="month">Last month</option>
+                        </select>
+                      </div>
+                      <div className="db-form-field">
+                        <label className="db-form-label">Max listings</label>
+                        <input
+                          className="db-form-input"
+                          type="number"
+                          min="1"
+                          max="100"
+                          value={linkedinForm.count}
+                          onChange={e => setLinkedinForm(f => ({ ...f, count: Number(e.target.value) }))}
+                        />
+                      </div>
                     </div>
-                    <div className="db-form-field">
-                      <label className="db-form-label">Country</label>
-                      <select
-                        className="db-form-select"
-                        value={scrapeForm.country}
-                        onChange={e => setScrapeForm(f => ({ ...f, country: e.target.value }))}
-                      >
-                        <option value="US">United States</option>
-                        <option value="GB">United Kingdom</option>
-                        <option value="CA">Canada</option>
-                        <option value="AU">Australia</option>
-                        <option value="DE">Germany</option>
-                        <option value="FR">France</option>
-                        <option value="NL">Netherlands</option>
-                        <option value="SG">Singapore</option>
-                        <option value="IN">India</option>
-                        <option value="remote">Remote</option>
-                      </select>
-                    </div>
-                    <div className="db-form-field">
-                      <label className="db-form-label">Max listings</label>
-                      <input
-                        className="db-form-input"
-                        type="number"
-                        min="1"
-                        max="100"
-                        value={scrapeForm.maxItems}
-                        onChange={e => setScrapeForm(f => ({ ...f, maxItems: Number(e.target.value) }))}
-                      />
-                    </div>
-                  </div>
+                  )}
                   <button
                     className={locked ? 'db-btn db-btn--locked' : 'db-btn db-btn--accent'}
                     type="submit"
