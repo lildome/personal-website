@@ -34,7 +34,25 @@ async function apiFetch(path, options = {}) {
   return fetch(API_BASE + path, { ...options, headers })
 }
 
-function ScoreBadge({ score, onLockClick }) {
+function relativeTime(dateStr) {
+  if (!dateStr) return '—'
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+  if (days === 0) return 'today'
+  if (days === 1) return 'yesterday'
+  if (days < 30) return `${days}d ago`
+  const months = Math.floor(days / 30)
+  return months === 1 ? '1mo ago' : `${months}mo ago`
+}
+
+function ScoreBadge({ score, onLockClick, pending }) {
+  if (pending) {
+    return (
+      <span className="db-pending-pill" title="Screening in progress">
+        ••••
+      </span>
+    )
+  }
   if (score == null) {
     return (
       <span
@@ -390,7 +408,16 @@ export default function Dashboard() {
   const [view, setView] = useState('list')
   const [selectedJobId, setSelectedJobId] = useState(null)
 
-  const [jobs, setJobs] = useState([])
+  // Bucket-keyed job cache. null = not yet fetched for that bucket.
+  const [bucketCache, setBucketCache] = useState({
+    screened: null,
+    analysed: null,
+    applied: null,
+    archive: null,
+  })
+  const [counts, setCounts] = useState({ screened: 0, analysed: 0, applied: 0, archive: 0 })
+  const [activeBucket, setActiveBucket] = useState('screened')
+
   const [jobDetail, setJobDetail] = useState(null)
   const [loading, setLoading] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
@@ -495,21 +522,29 @@ export default function Dashboard() {
     }
   }, [jobDetail?.resume?.status, jobDetail?.cover_letter?.status, jobDetail?.job?.id, handleUnauth])
 
-  const loadJobs = useCallback(async () => {
+  function invalidateAllCaches() {
+    setBucketCache({ screened: null, analysed: null, applied: null, archive: null })
+  }
+
+  const loadBucket = useCallback(async (bucket) => {
     setLoading(true)
     try {
-      const res = await apiFetch('/jobs')
+      const res = await apiFetch(`/jobs?bucket=${bucket}`)
       if (res.status === 401) { handleUnauth(); return }
       const data = await res.json()
-      setJobs(data)
+      setBucketCache(prev => ({ ...prev, [bucket]: data.jobs }))
+      setCounts(data.counts)
     } finally {
       setLoading(false)
     }
   }, [handleUnauth])
 
+  // Fetch the active bucket when its cache entry is empty
   useEffect(() => {
-    loadJobs()
-  }, [loadJobs])
+    if (bucketCache[activeBucket] === null) {
+      loadBucket(activeBucket)
+    }
+  }, [activeBucket, bucketCache, loadBucket])
 
   async function loadJobDetail(id) {
     setDetailLoading(true)
@@ -574,7 +609,7 @@ export default function Dashboard() {
       setLocked(false)
       setModalOpen(false)
       setPinInput('')
-      loadJobs()
+      invalidateAllCaches()
       if (selectedJobId) loadJobDetail(selectedJobId)
     } catch {
       setPinError('Network error. Try again.')
@@ -590,7 +625,8 @@ export default function Dashboard() {
       body: JSON.stringify({ status }),
     })
     if (res.status === 401) { handleUnauth(); openModal(); return }
-    setJobs(prev => prev.map(j => j.id === id ? { ...j, status } : j))
+    // Archive is automatic for rejected status; direct archive/restore actions in phase 11
+    invalidateAllCaches()
     if (jobDetail?.job?.id === id) {
       setJobDetail(prev => ({ ...prev, job: { ...prev.job, status } }))
     }
@@ -720,7 +756,9 @@ export default function Dashboard() {
     }
   }
 
-  const filteredJobs = jobs.filter(j => {
+  // Read from active bucket cache; time filter uses scrapedAt for all buckets — phase 12 for per-bucket refinement
+  const currentBucketJobs = bucketCache[activeBucket] || []
+  let displayJobs = currentBucketJobs.filter(j => {
     if (statusFilter && j.status !== statusFilter) return false
     if (timeFilter) {
       const cutoff = Date.now() - TIME_FILTER_MS[timeFilter]
@@ -728,6 +766,15 @@ export default function Dashboard() {
     }
     return true
   })
+  // Applied bucket: default sort by status_changed_at descending
+  if (activeBucket === 'applied') {
+    displayJobs = [...displayJobs].sort((a, b) => {
+      const aTime = a.status_changed_at ? new Date(a.status_changed_at).getTime() : 0
+      const bTime = b.status_changed_at ? new Date(b.status_changed_at).getTime() : 0
+      return bTime - aTime
+    })
+  }
+  const filteredJobs = displayJobs
 
   const detailTitle = jobDetail?.job?.positionName
     ? jobDetail.job.positionName.length > 32
@@ -813,8 +860,32 @@ export default function Dashboard() {
 
             <div className="db-toolbar">
               <div className="db-toolbar__left">
-                <h1 className="db-toolbar__heading">Jobs</h1>
-                <span className="db-toolbar__count">{filteredJobs.length}</span>
+                <div className="db-bucket-tabs">
+                  <button
+                    type="button"
+                    className={`db-bucket-tab${activeBucket === 'screened' ? ' db-bucket-tab--active' : ''}`}
+                    onClick={() => setActiveBucket('screened')}
+                  >
+                    Screened
+                    <span className="db-bucket-tab__count">{counts.screened}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`db-bucket-tab${activeBucket === 'analysed' ? ' db-bucket-tab--active' : ''}`}
+                    onClick={() => setActiveBucket('analysed')}
+                  >
+                    Analysed
+                    <span className="db-bucket-tab__count">{counts.analysed}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`db-bucket-tab${activeBucket === 'applied' ? ' db-bucket-tab--active' : ''}`}
+                    onClick={() => setActiveBucket('applied')}
+                  >
+                    Applied
+                    <span className="db-bucket-tab__count">{counts.applied}</span>
+                  </button>
+                </div>
               </div>
               <div className="db-toolbar__right">
                 <select
@@ -839,9 +910,12 @@ export default function Dashboard() {
                   <option value="interviewing">Interviewing</option>
                   <option value="offer">Offer</option>
                   <option value="rejected">Rejected</option>
-                  <option value="archived">Archived</option>
                 </select>
-                <button className="db-btn db-btn--secondary" onClick={loadJobs} disabled={loading}>
+                <button
+                  className="db-btn db-btn--secondary"
+                  onClick={invalidateAllCaches}
+                  disabled={loading}
+                >
                   {loading ? '…' : 'Refresh'}
                 </button>
                 <button
@@ -858,12 +932,34 @@ export default function Dashboard() {
               <table className="db-table">
                 <thead>
                   <tr>
-                    <th style={{ width: '28%' }}>Position</th>
-                    <th style={{ width: '20%' }}>Company</th>
-                    <th style={{ width: '18%' }}>Location</th>
-                    <th style={{ width: '10%' }}>Score</th>
-                    <th style={{ width: '13%' }}>Status</th>
-                    <th style={{ width: '11%' }}>Scraped</th>
+                    {activeBucket === 'screened' && (
+                      <>
+                        <th style={{ width: '28%' }}>Position</th>
+                        <th style={{ width: '20%' }}>Company</th>
+                        <th style={{ width: '18%' }}>Location</th>
+                        <th style={{ width: '10%' }}>Match</th>
+                        <th style={{ width: '10%' }}>Rec</th>
+                        <th style={{ width: '14%' }}>Scraped</th>
+                      </>
+                    )}
+                    {activeBucket === 'analysed' && (
+                      <>
+                        <th style={{ width: '30%' }}>Position</th>
+                        <th style={{ width: '20%' }}>Company</th>
+                        <th style={{ width: '18%' }}>Location</th>
+                        <th style={{ width: '10%' }}>Match</th>
+                        <th style={{ width: '10%' }}>Fit</th>
+                        <th style={{ width: '12%' }}>Analysed</th>
+                      </>
+                    )}
+                    {activeBucket === 'applied' && (
+                      <>
+                        <th style={{ width: '35%' }}>Position</th>
+                        <th style={{ width: '25%' }}>Company</th>
+                        <th style={{ width: '18%' }}>Status</th>
+                        <th style={{ width: '22%' }}>Last update</th>
+                      </>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -874,20 +970,70 @@ export default function Dashboard() {
                       onClick={() => openDetail(job.id)}
                     >
                       <td className="db-table__position">{job.positionName}</td>
-                      <td>{job.company}</td>
-                      <td className="db-table__muted">{job.location}</td>
-                      <td>
-                        <ScoreBadge score={job.match_score} onLockClick={openModal} />
-                      </td>
-                      <td><StatusPill status={job.status} /></td>
-                      <td className="db-table__muted db-table__mono">
-                        {job.scrapedAt?.slice(0, 10)}
-                      </td>
+                      <td>{job.canonical_name || job.company}</td>
+                      {activeBucket !== 'applied' && (
+                        <td className="db-table__muted">{job.location}</td>
+                      )}
+                      {activeBucket === 'screened' && (
+                        <>
+                          <td>
+                            <ScoreBadge
+                              score={job.screening?.match_score ?? null}
+                              pending={!job.screening}
+                              onLockClick={openModal}
+                            />
+                          </td>
+                          <td>
+                            <ScoreBadge
+                              score={job.screening?.recommendation_score ?? null}
+                              pending={!job.screening}
+                              onLockClick={openModal}
+                            />
+                          </td>
+                          <td className="db-table__muted db-table__mono">
+                            {job.scrapedAt?.slice(0, 10)}
+                          </td>
+                        </>
+                      )}
+                      {activeBucket === 'analysed' && (
+                        <>
+                          <td>
+                            <ScoreBadge
+                              score={job.analysis?.match_score ?? null}
+                              onLockClick={openModal}
+                            />
+                          </td>
+                          <td>
+                            {/* candidate_fit_score from company batch lookup; null = company not yet researched */}
+                            <ScoreBadge
+                              score={job.candidate_fit_score ?? null}
+                              onLockClick={openModal}
+                            />
+                          </td>
+                          {/* Analysed timestamp uses status_changed_at as proxy — phase 12 for explicit field */}
+                          <td className="db-table__muted db-table__mono">
+                            {relativeTime(job.status_changed_at)}
+                          </td>
+                        </>
+                      )}
+                      {activeBucket === 'applied' && (
+                        <>
+                          <td><StatusPill status={job.status} /></td>
+                          <td className="db-table__muted db-table__mono">
+                            {job.status_changed_at?.slice(0, 10)}
+                          </td>
+                        </>
+                      )}
                     </tr>
                   ))}
                   {!loading && filteredJobs.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="db-table__empty">No jobs found</td>
+                      <td
+                        colSpan={activeBucket === 'applied' ? 4 : 6}
+                        className="db-table__empty"
+                      >
+                        No jobs found
+                      </td>
                     </tr>
                   )}
                 </tbody>
@@ -926,17 +1072,23 @@ export default function Dashboard() {
                   <div className="db-card">
                     <h1 className="db-detail-title">
                       {jobDetail.job.positionName}
-                      <span className="db-detail-company"> @ {jobDetail.job.company}</span>
+                      <span className="db-detail-company">
+                        {' '}@ {jobDetail.job.canonical_name || jobDetail.job.company}
+                      </span>
                     </h1>
                     <div className="db-meta-row">
                       {jobDetail.job.location && (
                         <span className="db-tag">{jobDetail.job.location}</span>
                       )}
-                      <ScoreBadge score={jobDetail.job.match_score} onLockClick={openModal} />
+                      {/* analysis?.match_score — null for pre-analysis jobs (shows locked pill) */}
+                      <ScoreBadge
+                        score={jobDetail.job.analysis?.match_score ?? null}
+                        onLockClick={openModal}
+                      />
                     </div>
 
-                    {jobDetail.job.match_summary ? (
-                      <p className="db-match-summary">{jobDetail.job.match_summary}</p>
+                    {jobDetail.job.analysis?.match_reasoning ? (
+                      <p className="db-match-summary">{jobDetail.job.analysis.match_reasoning}</p>
                     ) : (
                       <div
                         className="db-locked-row"
@@ -979,7 +1131,7 @@ export default function Dashboard() {
                           <option value="interviewing">Interviewing</option>
                           <option value="offer">Offer</option>
                           <option value="rejected">Rejected</option>
-                          <option value="archived">Archived</option>
+                          {/* archived removed — backend auto-archives on rejected; direct archive/restore in phase 11 */}
                         </select>
                       )}
                     </div>
@@ -1016,20 +1168,74 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {/* Job summary card */}
-                  {jobDetail.job.summary && (
+                  {/* Screening card — shown only when screening block exists */}
+                  {jobDetail.job.screening && (
+                    <div className="db-card">
+                      <span className="db-section-label">Screening</span>
+                      {locked ? (
+                        <div
+                          className="db-locked-row"
+                          onClick={openModal}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={e => e.key === 'Enter' && openModal()}
+                        >
+                          <span className="db-locked-row__icon">
+                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                              <rect x="3" y="6" width="8" height="7" rx="1.5" fill="currentColor" opacity=".4"/>
+                              <path d="M4.5 6V4a2.5 2.5 0 0 1 5 0v2" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" fill="none"/>
+                            </svg>
+                          </span>
+                          <span className="db-locked-row__label">Screening analysis hidden</span>
+                          <span className="db-locked-row__action">Unlock to view →</span>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="db-screening-score-row">
+                            <ScoreBadge
+                              score={jobDetail.job.screening.match_score ?? null}
+                              onLockClick={openModal}
+                            />
+                            <span className="db-screening-sublabel">Match</span>
+                          </div>
+                          {jobDetail.job.screening.match_reasoning && (
+                            <p className="db-match-summary">{jobDetail.job.screening.match_reasoning}</p>
+                          )}
+                          <div className="db-screening-score-row">
+                            <ScoreBadge
+                              score={jobDetail.job.screening.recommendation_score ?? null}
+                              onLockClick={openModal}
+                            />
+                            <span className="db-screening-sublabel">Recommendation</span>
+                          </div>
+                          {jobDetail.job.screening.recommendation_reasoning && (
+                            <p className="db-match-summary">{jobDetail.job.screening.recommendation_reasoning}</p>
+                          )}
+                          {jobDetail.job.screening.divergence_reasoning && (
+                            <>
+                              <span className="db-section-label db-section-label--subsection">Divergence</span>
+                              <p className="db-match-summary">{jobDetail.job.screening.divergence_reasoning}</p>
+                            </>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Job summary card — reads from analysis?.summary */}
+                  {jobDetail.job.analysis?.summary && (
                     <div className="db-card">
                       <span className="db-section-label">Job summary</span>
 
-                      {jobDetail.job.summary.job_summary && (
-                        <p className="db-summary-text">{jobDetail.job.summary.job_summary}</p>
+                      {jobDetail.job.analysis.summary.job_summary && (
+                        <p className="db-summary-text">{jobDetail.job.analysis.summary.job_summary}</p>
                       )}
 
-                      {jobDetail.job.summary.experience_requirements?.length > 0 && (
+                      {jobDetail.job.analysis.summary.experience_requirements?.length > 0 && (
                         <div className="db-req-section">
                           <span className="db-section-label">Experience</span>
                           <ul className="db-req-list">
-                            {jobDetail.job.summary.experience_requirements.map((req, i) => (
+                            {jobDetail.job.analysis.summary.experience_requirements.map((req, i) => (
                               <li key={i} className="db-req-item">
                                 <span className="db-req-text">{reqText(req)}</span>
                                 {req.confidence && (
@@ -1043,11 +1249,11 @@ export default function Dashboard() {
                         </div>
                       )}
 
-                      {jobDetail.job.summary.skill_requirements?.length > 0 && (
+                      {jobDetail.job.analysis.summary.skill_requirements?.length > 0 && (
                         <div className="db-req-section">
                           <span className="db-section-label">Skills</span>
                           <ul className="db-req-list">
-                            {jobDetail.job.summary.skill_requirements.map((req, i) => (
+                            {jobDetail.job.analysis.summary.skill_requirements.map((req, i) => (
                               <li key={i} className="db-req-item">
                                 <span className="db-req-text">{reqText(req)}</span>
                                 {req.confidence && (
@@ -1061,9 +1267,9 @@ export default function Dashboard() {
                         </div>
                       )}
 
-                      {jobDetail.job.summary.red_flags &&
-                        jobDetail.job.summary.red_flags !== 'none identified' && (
-                          <p className="db-red-flags">⚠ {jobDetail.job.summary.red_flags}</p>
+                      {jobDetail.job.analysis.summary.red_flags &&
+                        jobDetail.job.analysis.summary.red_flags !== 'none identified' && (
+                          <p className="db-red-flags">⚠ {jobDetail.job.analysis.summary.red_flags}</p>
                         )}
                     </div>
                   )}
