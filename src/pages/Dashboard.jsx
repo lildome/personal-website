@@ -34,6 +34,20 @@ async function apiFetch(path, options = {}) {
   return fetch(API_BASE + path, { ...options, headers })
 }
 
+function isAnalysing(job) {
+  return ['summarising', 'researching', 'matching'].includes(job.analysis?.status)
+}
+
+function reasonLabel(reason, currentStatus) {
+  switch (reason) {
+    case 'not_found': return 'Job not found'
+    case 'in_progress': return `Already in progress (${currentStatus})`
+    case 'already_complete': return 'Already analysed'
+    case 'enqueue_failed': return 'Queue submission failed'
+    default: return reason
+  }
+}
+
 function ScoreBadge({ score, onLockClick }) {
   if (score == null) {
     return (
@@ -55,6 +69,51 @@ function ScoreBadge({ score, onLockClick }) {
 function StatusPill({ status }) {
   const slug = (status || 'unknown').toLowerCase().replace(/\s+/g, '-')
   return <span className={`db-status-pill db-status-pill--${slug}`}>{status || '-'}</span>
+}
+
+function AnalysisProgressPanel({ status, startedAt, error, onRetry }) {
+  const [elapsed, setElapsed] = useState(0)
+  const inFlight = ['summarising', 'researching', 'matching'].includes(status)
+
+  useEffect(() => {
+    if (!inFlight || !startedAt) { setElapsed(0); return }
+    const base = startedAt
+    setElapsed(Math.floor((Date.now() - base) / 1000))
+    const id = setInterval(() => setElapsed(Math.floor((Date.now() - base) / 1000)), 1000)
+    return () => clearInterval(id)
+  }, [inFlight, startedAt])
+
+  if (inFlight) {
+    const stepText = {
+      summarising: 'Summarising job description...',
+      researching: 'Researching company...',
+      matching: 'Matching against your CV...',
+    }[status] || 'Processing...'
+
+    return (
+      <div className="db-analysis-progress">
+        <span className="db-section-label">Analysis in progress</span>
+        <div className="db-analysis-progress__step">
+          <span className="db-spinner" aria-hidden="true" />
+          <span className="db-analysis-progress__text">{stepText} ({elapsed}s)</span>
+        </div>
+      </div>
+    )
+  }
+
+  if (status === 'failed') {
+    return (
+      <div className="db-analysis-progress db-analysis-progress--error">
+        <span className="db-section-label">Analysis failed</span>
+        {error && <p className="db-resume-panel__error-text">{error}</p>}
+        <button className="db-btn db-btn--accent" type="button" onClick={onRetry}>
+          Retry
+        </button>
+      </div>
+    )
+  }
+
+  return null
 }
 
 function ResumeOutputPanel({ status, pdfUrl, startedAt, error, onRegenerate, onDownload, locked, onLockClick }) {
@@ -395,7 +454,6 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
 
-  const [statusFilter, setStatusFilter] = useState('')
   const [timeFilter, setTimeFilter] = useState('')
 
   const [scrapeSource, setScrapeSource] = useState('indeed')
@@ -404,10 +462,24 @@ export default function Dashboard() {
   const [scrapeSuccess, setScrapeSuccess] = useState(false)
   const [scrapeLoading, setScrapeLoading] = useState(false)
 
+  // Bucket state
+  const [activeBucket, setActiveBucket] = useState('screened')
+  const [bucketCache, setBucketCache] = useState({})
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [dispatchInFlight, setDispatchInFlight] = useState(false)
+
+  // Toast state
+  const [toast, setToast] = useState(null)
+
+  // Analysis polling state
+  const [analysisStartedAt, setAnalysisStartedAt] = useState(null)
+
   const currentJobIdRef = useRef(null)
   const pollIntervalRef = useRef(null)
   const pollStartRef = useRef(null)
   const coverLetterPollStartRef = useRef(null)
+  const analysisPollIntervalRef = useRef(null)
+  const analysisPollStartRef = useRef(null)
 
   useEffect(() => {
     setNavSlot(document.getElementById('nav-extra-slot'))
@@ -426,6 +498,7 @@ export default function Dashboard() {
     currentJobIdRef.current = selectedJobId
   }, [selectedJobId])
 
+  // Resume / cover-letter polling
   useEffect(() => {
     const resumeStatus = jobDetail?.resume?.status
     const coverLetterStatus = jobDetail?.cover_letter?.status
@@ -494,6 +567,85 @@ export default function Dashboard() {
       }
     }
   }, [jobDetail?.resume?.status, jobDetail?.cover_letter?.status, jobDetail?.job?.id, handleUnauth])
+
+  // Analysis polling
+  useEffect(() => {
+    const analysisStatus = jobDetail?.job?.analysis?.status
+    const jobId = jobDetail?.job?.id
+    const inFlight = ['summarising', 'researching', 'matching'].includes(analysisStatus)
+
+    if (!inFlight || !jobId) {
+      if (analysisPollIntervalRef.current) {
+        clearInterval(analysisPollIntervalRef.current)
+        analysisPollIntervalRef.current = null
+      }
+      analysisPollStartRef.current = null
+      if (!inFlight) setAnalysisStartedAt(null)
+      return
+    }
+
+    if (analysisPollIntervalRef.current) return
+
+    analysisPollStartRef.current = Date.now()
+
+    analysisPollIntervalRef.current = setInterval(async () => {
+      const now = Date.now()
+
+      if (analysisPollStartRef.current && now - analysisPollStartRef.current > 240_000) {
+        analysisPollStartRef.current = null
+        clearInterval(analysisPollIntervalRef.current)
+        analysisPollIntervalRef.current = null
+        setJobDetail(prev => {
+          if (!prev || prev.job.id !== jobId) return prev
+          return {
+            ...prev,
+            job: {
+              ...prev.job,
+              analysis: { ...(prev.job.analysis || {}), status: 'failed', error: 'Analysis is taking longer than expected.' },
+            },
+          }
+        })
+        setAnalysisStartedAt(null)
+        return
+      }
+
+      if (currentJobIdRef.current !== jobId) {
+        clearInterval(analysisPollIntervalRef.current)
+        analysisPollIntervalRef.current = null
+        return
+      }
+
+      try {
+        const res = await apiFetch(`/jobs/${jobId}`)
+        if (res.status === 401) { handleUnauth(); return }
+        const data = await res.json()
+        if (currentJobIdRef.current !== jobId) return
+        setJobDetail(prev => prev && prev.job.id === jobId ? data : prev)
+      } catch {
+        // ignore transient network errors during polling
+      }
+    }, 3000)
+
+    return () => {
+      if (analysisPollIntervalRef.current) {
+        clearInterval(analysisPollIntervalRef.current)
+        analysisPollIntervalRef.current = null
+      }
+    }
+  }, [jobDetail?.job?.analysis?.status, jobDetail?.job?.id, handleUnauth])
+
+  // Toast auto-dismiss
+  useEffect(() => {
+    if (!toast) return
+    const id = setTimeout(() => setToast(null), 6000)
+    return () => clearTimeout(id)
+  }, [toast])
+
+  // Clear bucket cache and selection when jobs list refreshes
+  useEffect(() => {
+    setBucketCache({})
+    setSelectedIds(new Set())
+  }, [jobs])
 
   const loadJobs = useCallback(async () => {
     setLoading(true)
@@ -611,7 +763,6 @@ export default function Dashboard() {
 
     const res = await apiFetch(`/jobs/${selectedJobId}/resume`, { method: 'POST' })
     if (res.status === 401) { handleUnauth(); openModal(); return }
-    // 202 — polling picks up the real status
   }
 
   async function runCoverLetter() {
@@ -632,7 +783,6 @@ export default function Dashboard() {
       body: JSON.stringify({ mode: 'generate' }),
     })
     if (res.status === 401) { handleUnauth(); openModal(); return }
-    // 202 — polling picks up the real status
   }
 
   async function runCoverLetterRevise(feedback) {
@@ -654,7 +804,6 @@ export default function Dashboard() {
         body: JSON.stringify({ mode: 'revise', feedback }),
       })
       if (res.status === 401) { handleUnauth(); openModal(); return }
-      // 202 — polling picks up the real status
     } catch {
       setJobDetail(prev => prev ? {
         ...prev,
@@ -665,6 +814,117 @@ export default function Dashboard() {
         }
       } : prev)
     }
+  }
+
+  async function runFullAnalysis() {
+    if (locked) { openModal(); return }
+
+    const now = Date.now()
+    setAnalysisStartedAt(now)
+
+    setJobDetail(prev => prev ? {
+      ...prev,
+      job: {
+        ...prev.job,
+        analysis: { ...(prev.job.analysis || {}), status: 'summarising' },
+      },
+    } : prev)
+
+    try {
+      const res = await apiFetch('/jobs/full-analysis', {
+        method: 'POST',
+        body: JSON.stringify({ ids: [selectedJobId] }),
+      })
+      if (res.status === 401) { handleUnauth(); openModal(); return }
+
+      const data = await res.json()
+
+      if (data.rejected && data.rejected.length > 0) {
+        const reason = data.rejected[0].reason
+        setJobDetail(prev => {
+          if (!prev) return prev
+          const wasJustOptimistic = prev.job.analysis?.status === 'summarising' && !prev.job.analysis?.summary
+          return {
+            ...prev,
+            job: {
+              ...prev.job,
+              analysis: wasJustOptimistic ? null : prev.job.analysis,
+            },
+          }
+        })
+        setAnalysisStartedAt(null)
+        showToast({ variant: 'mixed', accepted: 0, rejected: [{ id: selectedJobId, reason }] })
+      }
+      // If accepted: polling picks up real status on next interval
+    } catch {
+      setJobDetail(prev => {
+        if (!prev) return prev
+        const wasJustOptimistic = prev.job.analysis?.status === 'summarising' && !prev.job.analysis?.summary
+        return {
+          ...prev,
+          job: {
+            ...prev.job,
+            analysis: wasJustOptimistic ? null : prev.job.analysis,
+          },
+        }
+      })
+      setAnalysisStartedAt(null)
+      showToast({ variant: 'error', message: 'Failed to start analysis. Try again.' })
+    }
+  }
+
+  async function dispatchBatch() {
+    if (locked) { openModal(); return }
+    setDispatchInFlight(true)
+
+    const ids = Array.from(selectedIds)
+
+    try {
+      const res = await apiFetch('/jobs/full-analysis', {
+        method: 'POST',
+        body: JSON.stringify({ ids }),
+      })
+      if (res.status === 401) { handleUnauth(); openModal(); return }
+
+      const data = await res.json()
+
+      showToast({
+        variant: data.rejected?.length ? 'mixed' : 'accepted',
+        accepted: data.accepted?.length || 0,
+        rejected: data.rejected || [],
+      })
+
+      const acceptedIds = data.accepted || []
+      const currentScreened = jobs.filter(j => {
+        if (timeFilter) {
+          const cutoff = Date.now() - TIME_FILTER_MS[timeFilter]
+          if (!j.scrapedAt || new Date(j.scrapedAt).getTime() < cutoff) return false
+        }
+        if (j.status === 'archived') return false
+        const isApplied = ['applied', 'interviewing', 'offer', 'rejected'].includes(j.status)
+        const isComplete = j.analysis?.status === 'complete'
+        return !isApplied && !isComplete
+      })
+
+      setBucketCache(prev => ({
+        ...prev,
+        screened: currentScreened.map(job =>
+          acceptedIds.includes(job.id)
+            ? { ...job, analysis: { ...(job.analysis || {}), status: 'summarising' } }
+            : job
+        ),
+      }))
+
+      setSelectedIds(new Set())
+    } catch {
+      showToast({ variant: 'error', message: 'Failed to dispatch batch. Try again.' })
+    } finally {
+      setDispatchInFlight(false)
+    }
+  }
+
+  function showToast(t) {
+    setToast(t)
   }
 
   async function downloadPdf(jobId, type) {
@@ -720,14 +980,51 @@ export default function Dashboard() {
     }
   }
 
-  const filteredJobs = jobs.filter(j => {
-    if (statusFilter && j.status !== statusFilter) return false
-    if (timeFilter) {
-      const cutoff = Date.now() - TIME_FILTER_MS[timeFilter]
-      if (!j.scrapedAt || new Date(j.scrapedAt).getTime() < cutoff) return false
+  function handleBucketChange(bucket) {
+    setActiveBucket(bucket)
+    setSelectedIds(new Set())
+  }
+
+  function getBucketJobs(bucket) {
+    if (bucketCache[bucket]) return bucketCache[bucket]
+
+    return jobs.filter(j => {
+      if (timeFilter) {
+        const cutoff = Date.now() - TIME_FILTER_MS[timeFilter]
+        if (!j.scrapedAt || new Date(j.scrapedAt).getTime() < cutoff) return false
+      }
+      if (j.status === 'archived') return false
+
+      const isApplied = ['applied', 'interviewing', 'offer', 'rejected'].includes(j.status)
+      const isComplete = j.analysis?.status === 'complete'
+
+      if (bucket === 'applied') return isApplied
+      if (bucket === 'analysed') return isComplete && !isApplied
+      return !isApplied && !isComplete
+    })
+  }
+
+  const activeBucketJobs = getBucketJobs(activeBucket)
+  const selectableJobs = activeBucketJobs.filter(j => !isAnalysing(j))
+  const allSelectableSelected = selectableJobs.length > 0 && selectedIds.size === selectableJobs.length
+  const someButNotAllSelected = selectedIds.size > 0 && !allSelectableSelected
+
+  function toggleSelect(id) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    if (allSelectableSelected) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(selectableJobs.map(j => j.id)))
     }
-    return true
-  })
+  }
 
   const detailTitle = jobDetail?.job?.positionName
     ? jobDetail.job.positionName.length > 32
@@ -739,6 +1036,11 @@ export default function Dashboard() {
     if (typeof req === 'string') return req
     return req.requirement || req.skill || req.text || ''
   }
+
+  const analysisStatus = jobDetail?.job?.analysis?.status
+  const analysisInFlight = ['summarising', 'researching', 'matching'].includes(analysisStatus)
+  const showRunAnalysisBtn = !['summarising', 'researching', 'matching', 'complete'].includes(analysisStatus)
+  const analysisComplete = analysisStatus === 'complete'
 
   const PinPill = locked ? (
     <button
@@ -798,6 +1100,37 @@ export default function Dashboard() {
         />
       )}
 
+      {/* Toast */}
+      {toast && (
+        <div className={`db-toast db-toast--${toast.variant}`}>
+          <button
+            className="db-toast__dismiss"
+            onClick={() => setToast(null)}
+            aria-label="Dismiss"
+          >×</button>
+          {toast.variant === 'accepted' && (
+            <p className="db-toast__message">
+              {toast.accepted} {toast.accepted === 1 ? 'job' : 'jobs'} queued for analysis
+            </p>
+          )}
+          {toast.variant === 'mixed' && (
+            <>
+              <p className="db-toast__message">
+                {toast.accepted} queued · {toast.rejected.length} rejected
+              </p>
+              <ul className="db-toast__details">
+                {toast.rejected.map((r, i) => (
+                  <li key={i}>{reasonLabel(r.reason, r.current_status)}</li>
+                ))}
+              </ul>
+            </>
+          )}
+          {toast.variant === 'error' && (
+            <p className="db-toast__message">{toast.message}</p>
+          )}
+        </div>
+      )}
+
       <div className="dashboard__inner">
 
         {/* ── LIST VIEW ─────────────────────────────────── */}
@@ -814,7 +1147,7 @@ export default function Dashboard() {
             <div className="db-toolbar">
               <div className="db-toolbar__left">
                 <h1 className="db-toolbar__heading">Jobs</h1>
-                <span className="db-toolbar__count">{filteredJobs.length}</span>
+                <span className="db-toolbar__count">{activeBucketJobs.length}</span>
               </div>
               <div className="db-toolbar__right">
                 <select
@@ -827,19 +1160,6 @@ export default function Dashboard() {
                   <option value="3days">Past 3 days</option>
                   <option value="week">Past week</option>
                   <option value="month">Past month</option>
-                </select>
-                <select
-                  className="db-filter-select"
-                  value={statusFilter}
-                  onChange={e => setStatusFilter(e.target.value)}
-                >
-                  <option value="">All statuses</option>
-                  <option value="new">New</option>
-                  <option value="applied">Applied</option>
-                  <option value="interviewing">Interviewing</option>
-                  <option value="offer">Offer</option>
-                  <option value="rejected">Rejected</option>
-                  <option value="archived">Archived</option>
                 </select>
                 <button className="db-btn db-btn--secondary" onClick={loadJobs} disabled={loading}>
                   {loading ? '…' : 'Refresh'}
@@ -854,40 +1174,131 @@ export default function Dashboard() {
               </div>
             </div>
 
+            <div className="db-bucket-tabs">
+              {[
+                { key: 'screened', label: 'Screened' },
+                { key: 'analysed', label: 'Analysed' },
+                { key: 'applied', label: 'Applied' },
+              ].map(({ key, label }) => (
+                <button
+                  key={key}
+                  type="button"
+                  className={`db-bucket-tab${activeBucket === key ? ' db-bucket-tab--active' : ''}`}
+                  onClick={() => handleBucketChange(key)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {activeBucket === 'screened' && selectedIds.size > 0 && (
+              <div className="db-dispatch-toolbar">
+                <span className="db-dispatch-toolbar__count">{selectedIds.size} selected</span>
+                <button
+                  className="db-btn db-btn--accent"
+                  onClick={dispatchBatch}
+                  disabled={dispatchInFlight}
+                  type="button"
+                >
+                  {dispatchInFlight && <span className="db-spinner" aria-hidden="true" />}
+                  Analyse {selectedIds.size} selected
+                </button>
+                <button
+                  className="db-btn db-btn--secondary"
+                  onClick={() => setSelectedIds(new Set())}
+                  type="button"
+                >
+                  Clear
+                </button>
+              </div>
+            )}
+
             <div className="db-table-wrap">
               <table className="db-table">
                 <thead>
                   <tr>
-                    <th style={{ width: '28%' }}>Position</th>
-                    <th style={{ width: '20%' }}>Company</th>
-                    <th style={{ width: '18%' }}>Location</th>
-                    <th style={{ width: '10%' }}>Score</th>
-                    <th style={{ width: '13%' }}>Status</th>
-                    <th style={{ width: '11%' }}>Scraped</th>
+                    {activeBucket === 'screened' && (
+                      <th className="db-checkbox-cell">
+                        <input
+                          type="checkbox"
+                          checked={allSelectableSelected}
+                          ref={el => { if (el) el.indeterminate = someButNotAllSelected }}
+                          onChange={toggleSelectAll}
+                          aria-label="Select all"
+                        />
+                      </th>
+                    )}
+                    {activeBucket === 'screened' ? (
+                      <>
+                        <th style={{ width: '26%' }}>Position</th>
+                        <th style={{ width: '18%' }}>Company</th>
+                        <th style={{ width: '17%' }}>Location</th>
+                        <th style={{ width: '10%' }}>Match</th>
+                        <th style={{ width: '10%' }}>Rec</th>
+                        <th style={{ width: '15%' }}>Scraped</th>
+                      </>
+                    ) : (
+                      <>
+                        <th style={{ width: '28%' }}>Position</th>
+                        <th style={{ width: '20%' }}>Company</th>
+                        <th style={{ width: '18%' }}>Location</th>
+                        <th style={{ width: '10%' }}>Score</th>
+                        <th style={{ width: '13%' }}>Status</th>
+                        <th style={{ width: '11%' }}>Scraped</th>
+                      </>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredJobs.map(job => (
+                  {activeBucketJobs.map(job => (
                     <tr
                       key={job.id}
                       className="db-table__row"
                       onClick={() => openDetail(job.id)}
                     >
+                      {activeBucket === 'screened' && (
+                        <td className="db-checkbox-cell">
+                          {isAnalysing(job) ? (
+                            <span className="db-spinner db-spinner--row" aria-label="Analysing" />
+                          ) : (
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.has(job.id)}
+                              onChange={() => toggleSelect(job.id)}
+                              onClick={e => e.stopPropagation()}
+                              aria-label={`Select ${job.positionName}`}
+                            />
+                          )}
+                        </td>
+                      )}
                       <td className="db-table__position">{job.positionName}</td>
                       <td>{job.company}</td>
                       <td className="db-table__muted">{job.location}</td>
-                      <td>
-                        <ScoreBadge score={job.match_score} onLockClick={openModal} />
-                      </td>
-                      <td><StatusPill status={job.status} /></td>
+                      {activeBucket === 'screened' ? (
+                        <>
+                          <td>
+                            <ScoreBadge score={job.match_score} onLockClick={openModal} />
+                          </td>
+                          <td className="db-table__muted">{job.recommendation || '—'}</td>
+                        </>
+                      ) : (
+                        <>
+                          <td>
+                            <ScoreBadge score={job.match_score} onLockClick={openModal} />
+                          </td>
+                          <td><StatusPill status={job.status} /></td>
+                        </>
+                      )}
                       <td className="db-table__muted db-table__mono">
                         {job.scrapedAt?.slice(0, 10)}
                       </td>
                     </tr>
                   ))}
-                  {!loading && filteredJobs.length === 0 && (
+                  {!loading && activeBucketJobs.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="db-table__empty">No jobs found</td>
+                      <td colSpan={activeBucket === 'screened' ? 7 : 6} className="db-table__empty">
+                        No jobs found
+                      </td>
                     </tr>
                   )}
                 </tbody>
@@ -935,7 +1346,21 @@ export default function Dashboard() {
                       <ScoreBadge score={jobDetail.job.match_score} onLockClick={openModal} />
                     </div>
 
-                    {jobDetail.job.match_summary ? (
+                    {analysisInFlight ? (
+                      <AnalysisProgressPanel
+                        status={analysisStatus}
+                        startedAt={analysisStartedAt}
+                        error={jobDetail.job.analysis?.error}
+                        onRetry={runFullAnalysis}
+                      />
+                    ) : analysisStatus === 'failed' ? (
+                      <AnalysisProgressPanel
+                        status="failed"
+                        startedAt={null}
+                        error={jobDetail.job.analysis?.error}
+                        onRetry={runFullAnalysis}
+                      />
+                    ) : jobDetail.job.match_summary ? (
                       <p className="db-match-summary">{jobDetail.job.match_summary}</p>
                     ) : (
                       <div
@@ -995,10 +1420,20 @@ export default function Dashboard() {
                           View listing ↗
                         </a>
                       )}
+                      {showRunAnalysisBtn && (
+                        <button
+                          className={locked ? 'db-btn db-btn--locked' : 'db-btn db-btn--accent'}
+                          onClick={runFullAnalysis}
+                          type="button"
+                        >
+                          Run full analysis
+                        </button>
+                      )}
                       <button
                         className={locked ? 'db-btn db-btn--locked' : 'db-btn db-btn--secondary'}
                         onClick={locked ? undefined : runResume}
-                        disabled={locked || jobDetail.resume?.status === 'generating'}
+                        disabled={locked || jobDetail.resume?.status === 'generating' || !analysisComplete}
+                        title={!analysisComplete ? 'Run full analysis first' : undefined}
                         type="button"
                       >
                         {!locked && jobDetail.resume?.status === 'generating' && <span className="db-spinner" aria-hidden="true" />}
@@ -1007,7 +1442,8 @@ export default function Dashboard() {
                       <button
                         className={locked ? 'db-btn db-btn--locked' : 'db-btn db-btn--secondary'}
                         onClick={locked ? undefined : runCoverLetter}
-                        disabled={locked || jobDetail.cover_letter?.status === 'generating'}
+                        disabled={locked || jobDetail.cover_letter?.status === 'generating' || !analysisComplete}
+                        title={!analysisComplete ? 'Run full analysis first' : undefined}
                         type="button"
                       >
                         {!locked && jobDetail.cover_letter?.status === 'generating' && <span className="db-spinner" aria-hidden="true" />}
