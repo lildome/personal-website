@@ -12,6 +12,33 @@ const TIME_FILTER_MS = {
   month: 30 * 24 * 60 * 60 * 1000,
 }
 
+function getTimeFilterField(bucket) {
+  switch (bucket) {
+    case 'applied': return 'status_changed_at'
+    case 'archive': return 'archived_at'
+    case 'analysed': return 'analysis_completed_at'
+    case 'screened':
+    default: return 'scrapedAt'
+  }
+}
+
+function getJobTimeValue(job, bucket) {
+  if (bucket === 'analysed') {
+    return job.analysis_completed_at || job.status_changed_at
+  }
+  return job[getTimeFilterField(bucket)]
+}
+
+function getTimeFilterVerb(bucket) {
+  switch (bucket) {
+    case 'applied': return 'Updated'
+    case 'archive': return 'Archived'
+    case 'analysed': return 'Analysed'
+    case 'screened':
+    default: return 'Scraped'
+  }
+}
+
 function getToken() {
   return localStorage.getItem('dashboard_token')
 }
@@ -1146,7 +1173,8 @@ export default function Dashboard() {
     if (statusFilter && j.status !== statusFilter) return false
     if (timeFilter) {
       const cutoff = Date.now() - TIME_FILTER_MS[timeFilter]
-      if (!j.scrapedAt || new Date(j.scrapedAt).getTime() < cutoff) return false
+      const value = getJobTimeValue(j, activeBucket)
+      if (!value || new Date(value).getTime() < cutoff) return false
     }
     return true
   })
@@ -1384,10 +1412,10 @@ export default function Dashboard() {
                   onChange={e => setTimeFilter(e.target.value)}
                 >
                   <option value="">All time</option>
-                  <option value="day">Past day</option>
-                  <option value="3days">Past 3 days</option>
-                  <option value="week">Past week</option>
-                  <option value="month">Past month</option>
+                  <option value="day">{getTimeFilterVerb(activeBucket)}: past day</option>
+                  <option value="3days">{getTimeFilterVerb(activeBucket)}: past 3 days</option>
+                  <option value="week">{getTimeFilterVerb(activeBucket)}: past week</option>
+                  <option value="month">{getTimeFilterVerb(activeBucket)}: past month</option>
                 </select>
                 <select
                   className="db-filter-select"
@@ -1557,7 +1585,7 @@ export default function Dashboard() {
                             />
                           </td>
                           <td className="db-table__muted db-table__mono">
-                            {relativeTime(job.status_changed_at)}
+                            {relativeTime(job.analysis_completed_at || job.status_changed_at)}
                           </td>
                         </>
                       )}
