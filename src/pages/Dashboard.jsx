@@ -461,6 +461,9 @@ export default function Dashboard() {
   const [failedIngestions, setFailedIngestions] = useState([])
   const [failedLoadError, setFailedLoadError] = useState(false)
 
+  // Phase 11 state
+  const [archiveInFlight, setArchiveInFlight] = useState(false)
+
   const currentJobIdRef = useRef(null)
   const pollIntervalRef = useRef(null)
   const pollStartRef = useRef(null)
@@ -774,6 +777,70 @@ export default function Dashboard() {
     }
   }
 
+  function computeRestoreDestination(job) {
+    const APPLIED_STATUSES = new Set(['applied', 'interviewing', 'offer', 'rejected'])
+    if (APPLIED_STATUSES.has(job.status)) return 'Applied'
+    if (job.analysis?.status === 'complete') return 'Analysed'
+    return 'Screened'
+  }
+
+  async function archiveJob() {
+    if (locked) { openModal(); return }
+    setArchiveInFlight(true)
+
+    try {
+      const res = await apiFetch(`/jobs/${selectedJobId}/archive`, { method: 'POST' })
+      if (res.status === 401) { handleUnauth(); openModal(); return }
+
+      if (!res.ok) {
+        showToast({ variant: 'error', message: 'Failed to archive. Try again.' })
+        return
+      }
+
+      const now = new Date().toISOString()
+      setJobDetail(prev => prev ? {
+        ...prev,
+        job: { ...prev.job, archived_at: now }
+      } : prev)
+
+      setBucketCache({ screened: null, analysed: null, applied: null, archive: null })
+      showToast({ variant: 'accepted', message: 'Job archived' })
+    } catch {
+      showToast({ variant: 'error', message: 'Failed to archive. Try again.' })
+    } finally {
+      setArchiveInFlight(false)
+    }
+  }
+
+  async function restoreJob() {
+    if (locked) { openModal(); return }
+    setArchiveInFlight(true)
+
+    try {
+      const res = await apiFetch(`/jobs/${selectedJobId}/restore`, { method: 'POST' })
+      if (res.status === 401) { handleUnauth(); openModal(); return }
+
+      if (!res.ok) {
+        showToast({ variant: 'error', message: 'Failed to restore. Try again.' })
+        return
+      }
+
+      setJobDetail(prev => prev ? {
+        ...prev,
+        job: { ...prev.job, archived_at: undefined }
+      } : prev)
+
+      const destination = computeRestoreDestination(jobDetail.job)
+      showToast({ variant: 'accepted', message: `Job restored to ${destination} bucket` })
+
+      setBucketCache({ screened: null, analysed: null, applied: null, archive: null })
+    } catch {
+      showToast({ variant: 'error', message: 'Failed to restore. Try again.' })
+    } finally {
+      setArchiveInFlight(false)
+    }
+  }
+
   async function runResume() {
     if (locked) { openModal(); return }
 
@@ -1083,14 +1150,28 @@ export default function Dashboard() {
     }
     return true
   })
-  if (activeBucket === 'applied') {
-    displayJobs = [...displayJobs].sort((a, b) => {
-      const aTime = a.status_changed_at ? new Date(a.status_changed_at).getTime() : 0
-      const bTime = b.status_changed_at ? new Date(b.status_changed_at).getTime() : 0
-      return bTime - aTime
-    })
-  }
   const filteredJobs = displayJobs
+
+  const sortedJobs = (() => {
+    if (activeBucket === 'archive') {
+      return [...filteredJobs].sort((a, b) =>
+        (b.archived_at || '').localeCompare(a.archived_at || '')
+      )
+    }
+    if (activeBucket === 'applied') {
+      return [...filteredJobs].sort((a, b) =>
+        (b.status_changed_at || '').localeCompare(a.status_changed_at || '')
+      )
+    }
+    if (activeBucket === 'analysed') {
+      return [...filteredJobs].sort((a, b) =>
+        (b.analysis?.match_score || 0) - (a.analysis?.match_score || 0)
+      )
+    }
+    return [...filteredJobs].sort((a, b) =>
+      (b.screening?.recommendation_score || 0) - (a.screening?.recommendation_score || 0)
+    )
+  })()
 
   // Derived selection state (screened only)
   const selectableJobs = activeBucket === 'screened' ? filteredJobs.filter(j => !isAnalysing(j)) : []
@@ -1179,9 +1260,11 @@ export default function Dashboard() {
           >×</button>
           {toast.variant === 'accepted' && (
             <p className="db-toast__message">
-              {toast.itemKind === 'url'
-                ? `${toast.accepted} URL${toast.accepted === 1 ? '' : 's'} submitted for ingestion`
-                : `${toast.accepted} ${toast.accepted === 1 ? 'job' : 'jobs'} queued for analysis`
+              {toast.message ||
+                (toast.itemKind === 'url'
+                  ? `${toast.accepted} URL${toast.accepted === 1 ? '' : 's'} submitted for ingestion`
+                  : `${toast.accepted} ${toast.accepted === 1 ? 'job' : 'jobs'} queued for analysis`
+                )
               }
             </p>
           )}
@@ -1280,6 +1363,17 @@ export default function Dashboard() {
                   >
                     Applied
                     <span className="db-bucket-tab__count">{counts.applied}</span>
+                  </button>
+
+                  <span className="db-bucket-tabs__separator" aria-hidden="true" />
+
+                  <button
+                    type="button"
+                    className={`db-bucket-tab${activeBucket === 'archive' ? ' db-bucket-tab--active' : ''}`}
+                    onClick={() => setActiveBucket('archive')}
+                  >
+                    Archive
+                    <span className="db-bucket-tab__count">{counts.archive}</span>
                   </button>
                 </div>
               </div>
@@ -1390,10 +1484,18 @@ export default function Dashboard() {
                         <th style={{ width: '22%' }}>Last update</th>
                       </>
                     )}
+                    {activeBucket === 'archive' && (
+                      <>
+                        <th style={{ width: '40%' }}>Position</th>
+                        <th style={{ width: '28%' }}>Company</th>
+                        <th style={{ width: '16%' }}>Status</th>
+                        <th style={{ width: '16%' }}>Archived</th>
+                      </>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredJobs.map(job => (
+                  {sortedJobs.map(job => (
                     <tr
                       key={job.id}
                       className="db-table__row"
@@ -1416,7 +1518,7 @@ export default function Dashboard() {
                       )}
                       <td className="db-table__position">{job.positionName}</td>
                       <td>{job.canonical_name || job.company}</td>
-                      {activeBucket !== 'applied' && (
+                      {activeBucket !== 'applied' && activeBucket !== 'archive' && (
                         <td className="db-table__muted">{job.location}</td>
                       )}
                       {activeBucket === 'screened' && (
@@ -1467,12 +1569,25 @@ export default function Dashboard() {
                           </td>
                         </>
                       )}
+                      {activeBucket === 'archive' && (
+                        <>
+                          <td><StatusPill status={job.status} /></td>
+                          <td className="db-table__muted db-table__mono">
+                            {job.archived_at?.slice(0, 10)}
+                          </td>
+                        </>
+                      )}
                     </tr>
                   ))}
-                  {!loading && filteredJobs.length === 0 && (
+                  {!loading && sortedJobs.length === 0 && (
                     <tr>
                       <td
-                        colSpan={activeBucket === 'applied' ? 4 : activeBucket === 'screened' ? 7 : 6}
+                        colSpan={
+                          activeBucket === 'applied' ? 4
+                          : activeBucket === 'archive' ? 4
+                          : activeBucket === 'screened' ? 7
+                          : 6
+                        }
                         className="db-table__empty"
                       >
                         No jobs found
@@ -1645,6 +1760,15 @@ export default function Dashboard() {
                       >
                         {!locked && jobDetail.cover_letter?.status === 'generating' && <span className="db-spinner" aria-hidden="true" />}
                         Cover letter
+                      </button>
+                      <button
+                        className={locked ? 'db-btn db-btn--locked' : 'db-btn db-btn--secondary'}
+                        onClick={locked ? undefined : (jobDetail.job.archived_at ? restoreJob : archiveJob)}
+                        type="button"
+                        disabled={archiveInFlight}
+                      >
+                        {archiveInFlight && <span className="db-spinner" aria-hidden="true" />}
+                        {jobDetail.job.archived_at ? 'Restore' : 'Archive'}
                       </button>
                     </div>
                   </div>
