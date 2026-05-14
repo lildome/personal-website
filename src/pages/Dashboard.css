@@ -1327,6 +1327,15 @@
   color: var(--color-accent);
 }
 
+.db-bucket-tabs__separator {
+  display: inline-block;
+  width: 1px;
+  height: 20px;
+  background: var(--color-border);
+  margin: 0 0.5rem;
+  align-self: center;
+}
+
 
 /* ─── Pending pill (screening not yet run) ────── */
 
