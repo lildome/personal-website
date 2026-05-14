@@ -49,12 +49,16 @@ function isAnalysing(job) {
   return ['summarising', 'researching', 'matching'].includes(job.analysis?.status)
 }
 
-function reasonLabel(reason, currentStatus) {
+function reasonLabel(reason, extras) {
   switch (reason) {
     case 'not_found': return 'Job not found'
-    case 'in_progress': return `Already in progress (${currentStatus})`
+    case 'in_progress': return `Already in progress (${extras?.current_status})`
     case 'already_complete': return 'Already analysed'
     case 'enqueue_failed': return 'Queue submission failed'
+    case 'malformed_url': return 'Not a valid URL'
+    case 'duplicate': return extras?.existing_job_id
+      ? 'Already in your jobs list'
+      : 'Duplicate URL'
     default: return reason
   }
 }
@@ -451,6 +455,12 @@ export default function Dashboard() {
   const [analysisStartedAt, setAnalysisStartedAt] = useState(null)
   const [analysisElapsed, setAnalysisElapsed] = useState(0)
 
+  // Phase 10 state
+  const [urlsText, setUrlsText] = useState('')
+  const [urlSubmitLoading, setUrlSubmitLoading] = useState(false)
+  const [failedIngestions, setFailedIngestions] = useState([])
+  const [failedLoadError, setFailedLoadError] = useState(false)
+
   const currentJobIdRef = useRef(null)
   const pollIntervalRef = useRef(null)
   const pollStartRef = useRef(null)
@@ -645,6 +655,15 @@ export default function Dashboard() {
   useEffect(() => {
     setSelectedIds(new Set())
   }, [activeBucket])
+
+  // Failed ingestions — load on mount and on urls tab switch
+  useEffect(() => {
+    reloadFailedIngestions()
+  }, [])
+
+  useEffect(() => {
+    if (scrapeSource === 'urls') reloadFailedIngestions()
+  }, [scrapeSource])
 
   function invalidateAllCaches() {
     setBucketCache({ screened: null, analysed: null, applied: null, archive: null })
@@ -944,15 +963,76 @@ export default function Dashboard() {
 
   function switchSource(newSource) {
     if (newSource === scrapeSource) return
-    const currentForm = scrapeSource === 'indeed' ? indeedForm : linkedinForm
-    const setNewForm = newSource === 'indeed' ? setIndeedForm : setLinkedinForm
-    setNewForm(prev => ({
-      ...prev,
-      keywords: currentForm.keywords,
-      location: currentForm.location,
-    }))
+    if (scrapeSource !== 'urls' && newSource !== 'urls') {
+      const currentForm = scrapeSource === 'indeed' ? indeedForm : linkedinForm
+      const setNewForm = newSource === 'indeed' ? setIndeedForm : setLinkedinForm
+      setNewForm(prev => ({
+        ...prev,
+        keywords: currentForm.keywords,
+        location: currentForm.location,
+      }))
+    }
     setScrapeSuccess(false)
     setScrapeSource(newSource)
+  }
+
+  async function reloadFailedIngestions() {
+    setFailedLoadError(false)
+    try {
+      const res = await apiFetch('/jobs/failed-ingestions')
+      if (res.status === 401) { handleUnauth(); return }
+      if (!res.ok) {
+        setFailedIngestions([])
+        setFailedLoadError(true)
+        return
+      }
+      const data = await res.json()
+      setFailedIngestions(Array.isArray(data) ? data : [])
+    } catch (e) {
+      setFailedIngestions([])
+      setFailedLoadError(true)
+    }
+  }
+
+  async function submitUrls() {
+    if (locked) { openModal(); return }
+
+    const urls = urlsText
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0)
+
+    if (urls.length === 0) return
+
+    setUrlSubmitLoading(true)
+
+    try {
+      const res = await apiFetch('/jobs/from-url', {
+        method: 'POST',
+        body: JSON.stringify({ urls }),
+      })
+      if (res.status === 401) { handleUnauth(); openModal(); return }
+
+      const data = await res.json()
+
+      showToast({
+        variant: data.rejected?.length ? 'mixed' : 'accepted',
+        accepted: data.accepted?.length || 0,
+        rejected: (data.rejected || []).map(r => ({
+          id: r.url,
+          reason: r.reason,
+          existing_job_id: r.existing_job_id,
+        })),
+        itemKind: 'url',
+      })
+
+      setUrlsText('')
+      reloadFailedIngestions()
+    } catch (e) {
+      showToast({ variant: 'error', message: 'Failed to submit URLs. Try again.' })
+    } finally {
+      setUrlSubmitLoading(false)
+    }
   }
 
   async function submitScrape(e) {
@@ -988,6 +1068,12 @@ export default function Dashboard() {
     }
   }
 
+  const urlsCount = urlsText
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line.length > 0)
+    .length
+
   const currentBucketJobs = bucketCache[activeBucket] || []
   let displayJobs = currentBucketJobs.filter(j => {
     if (statusFilter && j.status !== statusFilter) return false
@@ -1020,6 +1106,38 @@ export default function Dashboard() {
   function reqText(req) {
     if (typeof req === 'string') return req
     return req.requirement || req.skill || req.text || ''
+  }
+
+  function FailedIngestionsPanel() {
+    if (failedIngestions.length === 0) return null
+
+    return (
+      <div className="db-failed-ingestions">
+        <span className="db-section-label">
+          Failed ingestions ({failedIngestions.length})
+        </span>
+        <ul className="db-failed-ingestions__list">
+          {failedIngestions.map(item => (
+            <li key={item.id} className="db-failed-ingestions__item">
+              <a
+                href={item.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="db-failed-ingestions__url"
+              >
+                {item.url}
+              </a>
+              <span className="db-failed-ingestions__error">
+                {item.ingestion_error || 'Unknown error'}
+              </span>
+              <span className="db-failed-ingestions__date">
+                {item.scrapedAt?.slice(0, 10)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    )
   }
 
   const PinPill = locked ? (
@@ -1061,7 +1179,10 @@ export default function Dashboard() {
           >×</button>
           {toast.variant === 'accepted' && (
             <p className="db-toast__message">
-              {toast.accepted} {toast.accepted === 1 ? 'job' : 'jobs'} queued for analysis
+              {toast.itemKind === 'url'
+                ? `${toast.accepted} URL${toast.accepted === 1 ? '' : 's'} submitted for ingestion`
+                : `${toast.accepted} ${toast.accepted === 1 ? 'job' : 'jobs'} queued for analysis`
+              }
             </p>
           )}
           {toast.variant === 'mixed' && (
@@ -1071,7 +1192,10 @@ export default function Dashboard() {
               </p>
               <ul className="db-toast__details">
                 {toast.rejected.map((r, i) => (
-                  <li key={i}>{reasonLabel(r.reason, r.current_status)}</li>
+                  <li key={i}>
+                    {toast.itemKind === 'url' && <code className="db-toast__url">{r.id}</code>}
+                    {reasonLabel(r.reason, r)}
+                  </li>
                 ))}
               </ul>
             </>
@@ -1762,7 +1886,15 @@ export default function Dashboard() {
                   >
                     LinkedIn
                   </button>
+                  <button
+                    type="button"
+                    className={`db-source-tab${scrapeSource === 'urls' ? ' db-source-tab--active' : ''}`}
+                    onClick={() => switchSource('urls')}
+                  >
+                    From URLs
+                  </button>
                 </div>
+                {scrapeSource !== 'urls' ? (
                 <form className="db-search-form" onSubmit={submitScrape}>
                   {scrapeSource === 'indeed' ? (
                     <div className="db-form-grid">
@@ -1893,6 +2025,38 @@ export default function Dashboard() {
                     <p className="db-locked-note">Requires PIN unlock.</p>
                   )}
                 </form>
+                ) : (
+                  <div className="db-url-submit">
+                    <div className="db-form-field">
+                      <label className="db-form-label">URLs (one per line)</label>
+                      <textarea
+                        className="db-url-textarea"
+                        rows={10}
+                        placeholder={"https://example.com/jobs/123\nhttps://other.com/careers/456"}
+                        value={urlsText}
+                        onChange={e => setUrlsText(e.target.value)}
+                      />
+                      <span className="db-form-hint">
+                        {urlsCount === 0 ? 'No URLs entered' : `${urlsCount} URL${urlsCount === 1 ? '' : 's'} ready to submit`}
+                      </span>
+                    </div>
+
+                    <button
+                      className={locked ? 'db-btn db-btn--locked' : 'db-btn db-btn--accent'}
+                      type="button"
+                      onClick={submitUrls}
+                      disabled={urlsCount === 0 || urlSubmitLoading}
+                    >
+                      {urlSubmitLoading && <span className="db-spinner" aria-hidden="true" />}
+                      Submit {urlsCount > 0 ? urlsCount : ''} URL{urlsCount === 1 ? '' : 's'}
+                    </button>
+                    {locked && (
+                      <p className="db-locked-note">Requires PIN unlock.</p>
+                    )}
+
+                    <FailedIngestionsPanel />
+                  </div>
+                )}
                 {scrapeSuccess && (
                   <p className="db-scrape-success">
                     Search started. Results will appear in the jobs list once complete.
