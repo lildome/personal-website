@@ -86,8 +86,26 @@ function reasonLabel(reason, extras) {
     case 'duplicate': return extras?.existing_job_id
       ? 'Already in your jobs list'
       : 'Duplicate URL'
+    case 'nothing_to_retry': return 'Nothing to retry'
+    case 'missing_url': return 'No URL on record'
+    case 'delete_failed': return 'Could not delete record'
     default: return reason
   }
+}
+
+function canRetry(job) {
+  if (!job) return false
+  if (job.ingestion_status === 'failed') return false
+
+  const hasScreening = !!job.screening
+  const analysisStatus = job.analysis?.status
+
+  if (!hasScreening) return true
+
+  if (analysisStatus === undefined) return false
+  if (analysisStatus === 'complete') return false
+
+  return ['summarising', 'researching', 'matching', 'failed', 'pending'].includes(analysisStatus)
 }
 
 function ScoreBadge({ score, onLockClick, pending }) {
@@ -491,6 +509,11 @@ export default function Dashboard() {
   // Phase 11 state
   const [archiveInFlight, setArchiveInFlight] = useState(false)
 
+  // Phase 12 state
+  const [retryInFlight, setRetryInFlight] = useState(false)
+  const [retryAllInFlight, setRetryAllInFlight] = useState(false)
+  const [rowActionsInFlight, setRowActionsInFlight] = useState(new Set())
+
   const currentJobIdRef = useRef(null)
   const pollIntervalRef = useRef(null)
   const pollStartRef = useRef(null)
@@ -868,6 +891,39 @@ export default function Dashboard() {
     }
   }
 
+  async function retryJob() {
+    if (locked) { openModal(); return }
+    setRetryInFlight(true)
+
+    try {
+      const res = await apiFetch('/jobs/retry', {
+        method: 'POST',
+        body: JSON.stringify({ ids: [selectedJobId] }),
+      })
+      if (res.status === 401) { handleUnauth(); openModal(); return }
+
+      const data = await res.json()
+
+      if (data.rejected?.length > 0) {
+        showToast({
+          variant: 'mixed',
+          accepted: 0,
+          rejected: data.rejected,
+          itemKind: 'retry',
+        })
+        return
+      }
+
+      showToast({ variant: 'accepted', message: 'Retry queued' })
+      loadJobDetail(selectedJobId)
+      setBucketCache({ screened: null, analysed: null, applied: null, archive: null })
+    } catch (e) {
+      showToast({ variant: 'error', message: 'Failed to retry. Try again.' })
+    } finally {
+      setRetryInFlight(false)
+    }
+  }
+
   async function runResume() {
     if (locked) { openModal(); return }
 
@@ -1088,6 +1144,101 @@ export default function Dashboard() {
     }
   }
 
+  async function retryAllFailed() {
+    if (locked) { openModal(); return }
+    if (failedIngestions.length === 0) return
+
+    setRetryAllInFlight(true)
+    const ids = failedIngestions.map(item => item.id)
+
+    try {
+      const res = await apiFetch('/jobs/retry', {
+        method: 'POST',
+        body: JSON.stringify({ ids }),
+      })
+      if (res.status === 401) { handleUnauth(); openModal(); return }
+
+      const data = await res.json()
+
+      showToast({
+        variant: data.rejected?.length ? 'mixed' : 'accepted',
+        accepted: data.accepted?.length || 0,
+        rejected: data.rejected || [],
+        itemKind: 'retry',
+      })
+
+      reloadFailedIngestions()
+    } catch (e) {
+      showToast({ variant: 'error', message: 'Failed to retry. Try again.' })
+    } finally {
+      setRetryAllInFlight(false)
+    }
+  }
+
+  async function retrySingle(id) {
+    if (locked) { openModal(); return }
+
+    setRowActionsInFlight(prev => new Set(prev).add(id))
+
+    try {
+      const res = await apiFetch('/jobs/retry', {
+        method: 'POST',
+        body: JSON.stringify({ ids: [id] }),
+      })
+      if (res.status === 401) { handleUnauth(); openModal(); return }
+
+      const data = await res.json()
+
+      if (data.rejected?.length > 0) {
+        showToast({
+          variant: 'mixed',
+          accepted: 0,
+          rejected: data.rejected,
+          itemKind: 'retry',
+        })
+      } else {
+        showToast({ variant: 'accepted', message: 'Retry queued' })
+      }
+
+      reloadFailedIngestions()
+    } catch (e) {
+      showToast({ variant: 'error', message: 'Failed to retry. Try again.' })
+    } finally {
+      setRowActionsInFlight(prev => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
+    }
+  }
+
+  async function dismissSingle(id) {
+    if (locked) { openModal(); return }
+
+    setRowActionsInFlight(prev => new Set(prev).add(id))
+
+    try {
+      const res = await apiFetch(`/jobs/${id}`, { method: 'DELETE' })
+      if (res.status === 401) { handleUnauth(); openModal(); return }
+
+      if (!res.ok) {
+        showToast({ variant: 'error', message: 'Failed to dismiss. Try again.' })
+        return
+      }
+
+      showToast({ variant: 'accepted', message: 'Dismissed' })
+      reloadFailedIngestions()
+    } catch (e) {
+      showToast({ variant: 'error', message: 'Failed to dismiss. Try again.' })
+    } finally {
+      setRowActionsInFlight(prev => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
+    }
+  }
+
   async function submitUrls() {
     if (locked) { openModal(); return }
 
@@ -1222,9 +1373,20 @@ export default function Dashboard() {
 
     return (
       <div className="db-failed-ingestions">
-        <span className="db-section-label">
-          Failed ingestions ({failedIngestions.length})
-        </span>
+        <div className="db-failed-ingestions__header">
+          <span className="db-section-label">
+            Failed ingestions ({failedIngestions.length})
+          </span>
+          <button
+            className={locked ? 'db-btn db-btn--locked' : 'db-btn db-btn--secondary'}
+            onClick={locked ? undefined : retryAllFailed}
+            disabled={retryAllInFlight}
+            type="button"
+          >
+            {retryAllInFlight && <span className="db-spinner" aria-hidden="true" />}
+            Retry all
+          </button>
+        </div>
         <ul className="db-failed-ingestions__list">
           {failedIngestions.map(item => (
             <li key={item.id} className="db-failed-ingestions__item">
@@ -1242,6 +1404,24 @@ export default function Dashboard() {
               <span className="db-failed-ingestions__date">
                 {item.scrapedAt?.slice(0, 10)}
               </span>
+              <div className="db-failed-ingestions__actions">
+                <button
+                  className={locked ? 'db-btn db-btn--locked' : 'db-btn db-btn--secondary'}
+                  onClick={locked ? undefined : () => retrySingle(item.id)}
+                  disabled={rowActionsInFlight.has(item.id)}
+                  type="button"
+                >
+                  Retry
+                </button>
+                <button
+                  className={locked ? 'db-btn db-btn--locked' : 'db-btn db-btn--secondary'}
+                  onClick={locked ? undefined : () => dismissSingle(item.id)}
+                  disabled={rowActionsInFlight.has(item.id)}
+                  type="button"
+                >
+                  Dismiss
+                </button>
+              </div>
             </li>
           ))}
         </ul>
@@ -1291,7 +1471,9 @@ export default function Dashboard() {
               {toast.message ||
                 (toast.itemKind === 'url'
                   ? `${toast.accepted} URL${toast.accepted === 1 ? '' : 's'} submitted for ingestion`
-                  : `${toast.accepted} ${toast.accepted === 1 ? 'job' : 'jobs'} queued for analysis`
+                  : toast.itemKind === 'retry'
+                    ? `${toast.accepted} ${toast.accepted === 1 ? 'job' : 'jobs'} queued for retry`
+                    : `${toast.accepted} ${toast.accepted === 1 ? 'job' : 'jobs'} queued for analysis`
                 )
               }
             </p>
@@ -1767,6 +1949,17 @@ export default function Dashboard() {
                           type="button"
                         >
                           Run full analysis
+                        </button>
+                      )}
+                      {canRetry(jobDetail.job) && (
+                        <button
+                          className={locked ? 'db-btn db-btn--locked' : 'db-btn db-btn--secondary'}
+                          onClick={locked ? undefined : retryJob}
+                          disabled={retryInFlight}
+                          type="button"
+                        >
+                          {retryInFlight && <span className="db-spinner" aria-hidden="true" />}
+                          Retry
                         </button>
                       )}
                       <button
