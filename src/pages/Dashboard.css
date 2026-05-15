@@ -1530,9 +1530,52 @@
 .db-checkbox-cell input[type="checkbox"] {
   width: 14px;
   height: 14px;
-  accent-color: var(--color-accent);
+  margin: 0;
   cursor: pointer;
   vertical-align: middle;
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--color-bg-subtle);
+  border: 0.5px solid var(--color-border);
+  border-radius: 3px;
+  position: relative;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.db-checkbox-cell input[type="checkbox"]:hover {
+  border-color: var(--color-accent);
+}
+
+.db-checkbox-cell input[type="checkbox"]:checked {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.db-checkbox-cell input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 0px;
+  width: 4px;
+  height: 8px;
+  border: solid #111;
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+
+.db-checkbox-cell input[type="checkbox"]:indeterminate {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.db-checkbox-cell input[type="checkbox"]:indeterminate::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 5.5px;
+  width: 8px;
+  height: 1.5px;
+  background: #111;
 }
 
 .db-spinner--row {
