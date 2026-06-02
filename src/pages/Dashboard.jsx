@@ -1011,6 +1011,29 @@ export default function Dashboard() {
       },
     } : prev)
 
+    // Mirror the bucket movement that dispatchBatch does, so if the user
+    // navigates back to the list the job is already in the right bucket.
+    const movedJobId = selectedJobId
+    const wasInScreened = (bucketCache.screened || []).some(j => j.id === movedJobId)
+    setBucketCache(prev => {
+      const screenedNow = prev.screened || []
+      const moving = screenedNow.find(j => j.id === movedJobId)
+      if (!moving) return prev
+      const movedJob = { ...moving, analysis: { ...(moving.analysis || {}), status: 'summarising' } }
+      return {
+        ...prev,
+        screened: screenedNow.filter(j => j.id !== movedJobId),
+        analysed: prev.analysed ? [movedJob, ...prev.analysed] : prev.analysed,
+      }
+    })
+    if (wasInScreened) {
+      setCounts(prev => ({
+        ...prev,
+        screened: Math.max(0, prev.screened - 1),
+        analysed: prev.analysed + 1,
+      }))
+    }
+
     try {
       const res = await apiFetch('/jobs/full-analysis', {
         method: 'POST',
@@ -1071,13 +1094,24 @@ export default function Dashboard() {
         rejected: data.rejected || [],
       })
 
-      setBucketCache(prev => ({
+      // Move accepted jobs from Screened to Analysed in the local caches so the
+      // user sees them transition immediately, without waiting for a refresh.
+      const acceptedIds = new Set(data.accepted || [])
+      setBucketCache(prev => {
+        const screenedNow = prev.screened || []
+        const movingJobs = screenedNow
+          .filter(j => acceptedIds.has(j.id))
+          .map(j => ({ ...j, analysis: { ...(j.analysis || {}), status: 'summarising' } }))
+        return {
+          ...prev,
+          screened: screenedNow.filter(j => !acceptedIds.has(j.id)),
+          analysed: prev.analysed ? [...movingJobs, ...prev.analysed] : prev.analysed,
+        }
+      })
+      setCounts(prev => ({
         ...prev,
-        screened: prev.screened?.map(job =>
-          (data.accepted || []).includes(job.id)
-            ? { ...job, analysis: { ...(job.analysis || {}), status: 'summarising' } }
-            : job
-        ) || prev.screened,
+        screened: Math.max(0, prev.screened - acceptedIds.size),
+        analysed: prev.analysed + acceptedIds.size,
       }))
 
       setSelectedIds(new Set())
@@ -1343,9 +1377,19 @@ export default function Dashboard() {
       )
     }
     if (activeBucket === 'analysed') {
-      return [...filteredJobs].sort((a, b) =>
+      // Two visual groups: in-flight at top (most recently started first),
+      // then complete/failed below sorted by match_score descending.
+      const inFlight = filteredJobs.filter(j => isAnalysing(j))
+      const settled = filteredJobs.filter(j => !isAnalysing(j))
+      inFlight.sort((a, b) =>
+        (b.status_changed_at || b.scrapedAt || '').localeCompare(
+          a.status_changed_at || a.scrapedAt || ''
+        )
+      )
+      settled.sort((a, b) =>
         (b.analysis?.match_score || 0) - (a.analysis?.match_score || 0)
       )
+      return [...inFlight, ...settled]
     }
     return [...filteredJobs].sort((a, b) =>
       (b.screening?.recommendation_score || 0) - (a.screening?.recommendation_score || 0)
@@ -1755,19 +1799,41 @@ export default function Dashboard() {
                       {activeBucket === 'analysed' && (
                         <>
                           <td>
-                            <ScoreBadge
-                              score={job.analysis?.match_score ?? null}
-                              onLockClick={openModal}
-                            />
+                            {isAnalysing(job) ? (
+                              <span
+                                className="db-spinner db-spinner--row"
+                                title={`Analysis in progress: ${job.analysis?.status}`}
+                                aria-label={`Analysing: ${job.analysis?.status}`}
+                              />
+                            ) : job.analysis?.status === 'failed' ? (
+                              <span
+                                className="db-status-pill db-status-pill--rejected"
+                                title={job.analysis?.error || 'Analysis failed'}
+                              >
+                                failed
+                              </span>
+                            ) : (
+                              <ScoreBadge
+                                score={job.analysis?.match_score ?? null}
+                                onLockClick={openModal}
+                              />
+                            )}
                           </td>
                           <td>
-                            <ScoreBadge
-                              score={job.candidate_fit_score ?? null}
-                              onLockClick={openModal}
-                            />
+                            {isAnalysing(job) || job.analysis?.status === 'failed' ? (
+                              <span className="db-table__muted">—</span>
+                            ) : (
+                              <ScoreBadge
+                                score={job.candidate_fit_score ?? null}
+                                onLockClick={openModal}
+                              />
+                            )}
                           </td>
                           <td className="db-table__muted db-table__mono">
-                            {relativeTime(job.analysis_completed_at || job.status_changed_at)}
+                            {isAnalysing(job)
+                              ? `${job.analysis?.status}…`
+                              : relativeTime(job.analysis_completed_at || job.status_changed_at)
+                            }
                           </td>
                         </>
                       )}
