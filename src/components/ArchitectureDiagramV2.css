@@ -1,0 +1,110 @@
+/* ── Diagram wrapper ──────────────────────────────────────────── */
+
+.arch-v2-diagram {
+  width: 100%;
+  font-family: inherit;
+}
+
+/* ── Desktop SVG ──────────────────────────────────────────────── */
+
+/* .arch-svg is shared with v1; v2 uses the same class */
+
+/* ── Mobile HTML layout ───────────────────────────────────────── */
+
+.arch-v2-mobile {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .arch-v2-diagram .arch-svg { display: none; }
+  .arch-v2-mobile             { display: flex; flex-direction: column; align-items: center; gap: 0; }
+}
+
+/* Tier group */
+.arch-v2-m-tier {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 20px;
+}
+
+.arch-v2-m-tier:first-child {
+  margin-top: 0;
+}
+
+.arch-v2-m-tier-label {
+  align-self: flex-start;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin: 0 0 8px;
+}
+
+/* Node items */
+.arch-v2-m-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 300px;
+}
+
+.arch-v2-m-node {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 6px;
+  border-left: 4px solid transparent;
+  text-align: center;
+}
+
+.arch-v2-m-name {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.arch-v2-m-sub {
+  display: block;
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+/* Arrow connectors */
+.arch-v2-m-arrow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 0;
+}
+
+.arch-v2-m-arrow-track {
+  display: block;
+  width: 1.5px;
+  height: 18px;
+  background: var(--arch-v2-line, #73726C);
+  position: relative;
+}
+
+.arch-v2-m-arrow-track::after {
+  content: '';
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 6px solid var(--arch-v2-line, #73726C);
+}
+
+.arch-v2-m-arrow-label {
+  font-size: 10px;
+  line-height: 1;
+  margin-top: 6px;
+}
