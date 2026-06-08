@@ -2,12 +2,14 @@ import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import projectData from '../data/projects.json'
 import ArchitectureDiagram from '../components/ArchitectureDiagram'
+import ArchitectureDiagramV2 from '../components/ArchitectureDiagramV2'
 import './Blog.css'
 
 const project = projectData.projects[0]
 
 function Blog() {
-  const [expanded, setExpanded] = useState(false)
+  const [expandedV1, setExpandedV1] = useState(false)
+  const [expandedV2, setExpandedV2] = useState(true)
 
   return (
     <div className="blog">
@@ -88,12 +90,18 @@ function Blog() {
         </div>
       </section>
 
-      {/* Section 4 — How it came together */}
+      {/* Section 4 — How it was built */}
       <section className="blog-section">
         <div className="blog-section__inner blog-section__inner--narrow">
           <h2 className="blog-section__heading">{project.evolution.heading}</h2>
-          {project.evolution.paragraphs.map((para, i) => (
-            <p key={i} className="blog-section__para">{para}</p>
+          {project.evolution.parts.map((part, i) => (
+            <React.Fragment key={i}>
+              <h3 className="blog-section__subheading">{part.subheading}</h3>
+              {part.intro && <p className="blog-section__para">{part.intro}</p>}
+              {part.paragraphs.map((para, j) => (
+                <p key={j} className="blog-section__para">{para}</p>
+              ))}
+            </React.Fragment>
           ))}
         </div>
       </section>
@@ -103,23 +111,44 @@ function Blog() {
         <div className="blog-section__inner">
           <h2 className="blog-section__heading">Architecture</h2>
 
-          {/* Expandable flowchart */}
+          {/* v1 diagram — collapsed by default */}
           <div className="flowchart">
             <button
               className="flowchart__toggle"
-              onClick={() => setExpanded(e => !e)}
-              aria-expanded={expanded}
+              onClick={() => setExpandedV1(e => !e)}
+              aria-expanded={expandedV1}
             >
               <div className="flowchart__toggle-text">
-                <span className="flowchart__toggle-title">AWS architecture diagram</span>
-                <span className="flowchart__toggle-sub">Full data flow — trigger to output</span>
+                <span className="flowchart__toggle-title">Original architecture</span>
+                <span className="flowchart__toggle-sub">Version 1 — the single-pass pipeline</span>
               </div>
-              <span className={`flowchart__chevron${expanded ? ' flowchart__chevron--open' : ''}`}>›</span>
+              <span className={`flowchart__chevron${expandedV1 ? ' flowchart__chevron--open' : ''}`}>›</span>
             </button>
 
-            {expanded && (
+            {expandedV1 && (
               <div className="flowchart__content">
                 <ArchitectureDiagram layout="vertical" />
+              </div>
+            )}
+          </div>
+
+          {/* v2 diagram — open by default */}
+          <div className="flowchart">
+            <button
+              className="flowchart__toggle"
+              onClick={() => setExpandedV2(e => !e)}
+              aria-expanded={expandedV2}
+            >
+              <div className="flowchart__toggle-text">
+                <span className="flowchart__toggle-title">Current architecture</span>
+                <span className="flowchart__toggle-sub">Version 2 — screen first, analyse on demand</span>
+              </div>
+              <span className={`flowchart__chevron${expandedV2 ? ' flowchart__chevron--open' : ''}`}>›</span>
+            </button>
+
+            {expandedV2 && (
+              <div className="flowchart__content">
+                <ArchitectureDiagramV2 />
               </div>
             )}
           </div>
@@ -127,8 +156,11 @@ function Blog() {
           {/* Decision cards */}
           <div className="decisions-grid">
             {project.decisions.map((d, i) => (
-              <div key={i} className="decision-card">
+              <div key={i} className={`decision-card decision-card--${d.type}`}>
                 <div className="decision-card__half">
+                  <span className={`decision-card__tag decision-card__tag--${d.type}`}>
+                    {d.type === 'rework' ? 'REWORK' : 'ORIGINAL'}
+                  </span>
                   <span className="decision-card__label decision-card__label--problem">Problem</span>
                   <p className="decision-card__text">{d.problem}</p>
                 </div>
@@ -174,13 +206,16 @@ function Blog() {
         <div className="blog-section__inner blog-section__inner--narrow">
           <h2 className="blog-section__heading">{project.nextSteps.heading}</h2>
           <p className="blog-section__para">{project.nextSteps.intro}</p>
-          <ul className="next-steps">
-            {project.nextSteps.items.map((item, i) => (
-              <li key={i}>
-                <span style={{ fontWeight: 500 }}>{item.title}</span>{' '}{item.description}
-              </li>
-            ))}
-          </ul>
+          {project.nextSteps.groups.map((group, i) => (
+            <React.Fragment key={i}>
+              {group.intro && <p className="blog-section__para">{group.intro}</p>}
+              <ul className="next-steps">
+                {group.bullets.map((bullet, j) => (
+                  <li key={j}>{bullet}</li>
+                ))}
+              </ul>
+            </React.Fragment>
+          ))}
         </div>
       </section>
       {/* Section 9 — Explore */}
