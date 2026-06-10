@@ -490,6 +490,7 @@ export default function Dashboard() {
   const [scrapeSource, setScrapeSource] = useState('indeed')
   const [indeedForm, setIndeedForm] = useState({ keywords: '', location: '', country: 'US', maxItems: 25 })
   const [linkedinForm, setLinkedinForm] = useState({ keywords: '', location: '', remote: '', posted_within: '', count: 50 })
+  const [seekForm, setSeekForm] = useState({ keywords: '', location: '', remote: '', posted_within: '', count: 100, state: '', postCode: '', radius: '' })
   const [scrapeSuccess, setScrapeSuccess] = useState(false)
   const [scrapeLoading, setScrapeLoading] = useState(false)
 
@@ -1148,8 +1149,9 @@ export default function Dashboard() {
   function switchSource(newSource) {
     if (newSource === scrapeSource) return
     if (scrapeSource !== 'urls' && newSource !== 'urls') {
-      const currentForm = scrapeSource === 'indeed' ? indeedForm : linkedinForm
-      const setNewForm = newSource === 'indeed' ? setIndeedForm : setLinkedinForm
+      const FORMS = { indeed: [indeedForm, setIndeedForm], linkedin: [linkedinForm, setLinkedinForm], seek: [seekForm, setSeekForm] }
+      const [currentForm] = FORMS[scrapeSource]
+      const [, setNewForm] = FORMS[newSource]
       setNewForm(prev => ({
         ...prev,
         keywords: currentForm.keywords,
@@ -1329,7 +1331,7 @@ export default function Dashboard() {
             ...(indeedForm.maxItems ? { maxItemsPerSearch: indeedForm.maxItems } : {}),
           }),
         })
-      } else {
+      } else if (scrapeSource === 'linkedin') {
         await apiFetch('/scrape/linkedin', {
           method: 'POST',
           body: JSON.stringify({
@@ -1338,6 +1340,20 @@ export default function Dashboard() {
             ...(linkedinForm.remote ? { remote: linkedinForm.remote } : {}),
             ...(linkedinForm.posted_within ? { posted_within: linkedinForm.posted_within } : {}),
             ...(linkedinForm.count ? { count: linkedinForm.count } : {}),
+          }),
+        })
+      } else {
+        await apiFetch('/scrape/seek', {
+          method: 'POST',
+          body: JSON.stringify({
+            keywords: seekForm.keywords,
+            location: seekForm.location,
+            ...(seekForm.remote ? { remote: seekForm.remote } : {}),
+            ...(seekForm.posted_within ? { posted_within: seekForm.posted_within } : {}),
+            ...(seekForm.count ? { count: seekForm.count } : {}),
+            ...(seekForm.state ? { state: seekForm.state } : {}),
+            ...(seekForm.postCode ? { postCode: seekForm.postCode } : {}),
+            ...(seekForm.radius ? { radius: seekForm.radius } : {}),
           }),
         })
       }
@@ -2285,6 +2301,13 @@ export default function Dashboard() {
                 <div className="db-source-tabs">
                   <button
                     type="button"
+                    className={`db-source-tab${scrapeSource === 'linkedin' ? ' db-source-tab--active' : ''}`}
+                    onClick={() => switchSource('linkedin')}
+                  >
+                    LinkedIn
+                  </button>
+                  <button
+                    type="button"
                     className={`db-source-tab${scrapeSource === 'indeed' ? ' db-source-tab--active' : ''}`}
                     onClick={() => switchSource('indeed')}
                   >
@@ -2292,10 +2315,10 @@ export default function Dashboard() {
                   </button>
                   <button
                     type="button"
-                    className={`db-source-tab${scrapeSource === 'linkedin' ? ' db-source-tab--active' : ''}`}
-                    onClick={() => switchSource('linkedin')}
+                    className={`db-source-tab${scrapeSource === 'seek' ? ' db-source-tab--active' : ''}`}
+                    onClick={() => switchSource('seek')}
                   >
-                    LinkedIn
+                    Seek
                   </button>
                   <button
                     type="button"
@@ -2361,7 +2384,7 @@ export default function Dashboard() {
                         />
                       </div>
                     </div>
-                  ) : (
+                  ) : scrapeSource === 'linkedin' ? (
                     <div className="db-form-grid">
                       <div className="db-form-field">
                         <label className="db-form-label">Keywords</label>
@@ -2421,6 +2444,98 @@ export default function Dashboard() {
                           max="100"
                           value={linkedinForm.count}
                           onChange={e => setLinkedinForm(f => ({ ...f, count: Number(e.target.value) }))}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="db-form-grid">
+                      <div className="db-form-field">
+                        <label className="db-form-label">Keywords</label>
+                        <input
+                          className="db-form-input"
+                          type="text"
+                          required
+                          value={seekForm.keywords}
+                          onChange={e => setSeekForm(f => ({ ...f, keywords: e.target.value }))}
+                          placeholder="e.g. Software Engineer"
+                        />
+                      </div>
+                      <div className="db-form-field">
+                        <label className="db-form-label">Location</label>
+                        <input
+                          className="db-form-input"
+                          type="text"
+                          value={seekForm.location}
+                          onChange={e => setSeekForm(f => ({ ...f, location: e.target.value }))}
+                          placeholder="e.g. Melbourne"
+                        />
+                      </div>
+                      <div className="db-form-field">
+                        <label className="db-form-label">Remote</label>
+                        <select
+                          className="db-form-select"
+                          value={seekForm.remote}
+                          onChange={e => setSeekForm(f => ({ ...f, remote: e.target.value }))}
+                        >
+                          <option value="">Any</option>
+                          <option value="onsite">On-site</option>
+                          <option value="remote">Remote</option>
+                          <option value="hybrid">Hybrid</option>
+                        </select>
+                      </div>
+                      <div className="db-form-field">
+                        <label className="db-form-label">Posted within</label>
+                        <select
+                          className="db-form-select"
+                          value={seekForm.posted_within}
+                          onChange={e => setSeekForm(f => ({ ...f, posted_within: e.target.value }))}
+                        >
+                          <option value="">Any</option>
+                          <option value="day">Last day</option>
+                          <option value="3days">Last 3 days</option>
+                          <option value="week">Last week</option>
+                          <option value="month">Last month</option>
+                        </select>
+                      </div>
+                      <div className="db-form-field">
+                        <label className="db-form-label">Max listings</label>
+                        <input
+                          className="db-form-input"
+                          type="number"
+                          min="1"
+                          max="100"
+                          value={seekForm.count}
+                          onChange={e => setSeekForm(f => ({ ...f, count: Number(e.target.value) }))}
+                        />
+                      </div>
+                      <div className="db-form-field">
+                        <label className="db-form-label">State</label>
+                        <input
+                          className="db-form-input"
+                          type="text"
+                          value={seekForm.state}
+                          onChange={e => setSeekForm(f => ({ ...f, state: e.target.value }))}
+                          placeholder="e.g. VIC"
+                        />
+                      </div>
+                      <div className="db-form-field">
+                        <label className="db-form-label">Post code</label>
+                        <input
+                          className="db-form-input"
+                          type="text"
+                          value={seekForm.postCode}
+                          onChange={e => setSeekForm(f => ({ ...f, postCode: e.target.value }))}
+                          placeholder="e.g. 3000"
+                        />
+                      </div>
+                      <div className="db-form-field">
+                        <label className="db-form-label">Radius (km)</label>
+                        <input
+                          className="db-form-input"
+                          type="text"
+                          value={seekForm.radius}
+                          onChange={e => setSeekForm(f => ({ ...f, radius: e.target.value }))}
+                          placeholder="e.g. 25"
                         />
                       </div>
                     </div>
