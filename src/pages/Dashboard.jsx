@@ -468,7 +468,7 @@ export default function Dashboard() {
   const [pinLoading, setPinLoading] = useState(false)
   const [lockModalOpen, setLockModalOpen] = useState(false)
 
-  const [view, setView] = useState('list')
+  const [view, setView] = useState('companies')
   const [selectedJobId, setSelectedJobId] = useState(null)
 
   const [bucketCache, setBucketCache] = useState({
@@ -514,6 +514,11 @@ export default function Dashboard() {
   const [retryInFlight, setRetryInFlight] = useState(false)
   const [retryAllInFlight, setRetryAllInFlight] = useState(false)
   const [rowActionsInFlight, setRowActionsInFlight] = useState(new Set())
+
+  // Company grouped view state
+  const [screenedCompanies, setScreenedCompanies] = useState(null)
+  const [selectedCompany, setSelectedCompany] = useState(null)
+  const [companyJobActionsInFlight, setCompanyJobActionsInFlight] = useState(new Set())
 
   const currentJobIdRef = useRef(null)
   const pollIntervalRef = useRef(null)
@@ -721,6 +726,7 @@ export default function Dashboard() {
 
   function invalidateAllCaches() {
     setBucketCache({ screened: null, analysed: null, applied: null, archive: null })
+    setScreenedCompanies(null)
     setSelectedIds(new Set())
   }
 
@@ -736,6 +742,25 @@ export default function Dashboard() {
       setLoading(false)
     }
   }, [handleUnauth])
+
+  const loadScreenedGrouped = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await apiFetch('/jobs?bucket=screened&group_by_company=true')
+      if (res.status === 401) { handleUnauth(); return }
+      const data = await res.json()
+      setScreenedCompanies(data.companies || [])
+      setCounts(data.counts)
+    } finally {
+      setLoading(false)
+    }
+  }, [handleUnauth])
+
+  useEffect(() => {
+    if (view === 'companies' && screenedCompanies === null) {
+      loadScreenedGrouped()
+    }
+  }, [view, screenedCompanies, loadScreenedGrouped])
 
   useEffect(() => {
     if (bucketCache[activeBucket] === null) {
@@ -766,6 +791,11 @@ export default function Dashboard() {
     setView('list')
     setSelectedJobId(null)
     setJobDetail(null)
+  }
+
+  function backToCompanies() {
+    setView('companies')
+    setSelectedCompany(null)
   }
 
   function openModal() {
@@ -860,6 +890,129 @@ export default function Dashboard() {
       showToast({ variant: 'error', message: 'Failed to archive. Try again.' })
     } finally {
       setArchiveInFlight(false)
+    }
+  }
+
+  async function archiveJobById(jobId) {
+    if (locked) { openModal(); return }
+    setCompanyJobActionsInFlight(prev => new Set(prev).add(`archive-${jobId}`))
+
+    try {
+      const res = await apiFetch(`/jobs/${jobId}/archive`, { method: 'POST' })
+      if (res.status === 401) { handleUnauth(); openModal(); return }
+
+      if (!res.ok) {
+        showToast({ variant: 'error', message: 'Failed to archive. Try again.' })
+        return
+      }
+
+      // Mark as archiving briefly for grey-out, then remove from company view
+      setCompanyJobActionsInFlight(prev => new Set(prev).add(`archived-${jobId}`))
+      setTimeout(() => {
+        setSelectedCompany(prev => {
+          if (!prev) return prev
+          const remaining = prev.jobs.filter(j => j.id !== jobId)
+          if (remaining.length === 0) {
+            setView('companies')
+            return null
+          }
+          return { ...prev, jobs: remaining }
+        })
+        setScreenedCompanies(prev => {
+          if (!prev) return prev
+          return prev.map(c => {
+            if (!c.jobs?.some(j => j.id === jobId)) return c
+            const remaining = c.jobs.filter(j => j.id !== jobId)
+            return { ...c, jobs: remaining, count: remaining.length }
+          }).filter(c => c.count > 0)
+        })
+        setCounts(prev => ({ ...prev, screened: Math.max(0, prev.screened - 1) }))
+        setCompanyJobActionsInFlight(prev => {
+          const next = new Set(prev)
+          next.delete(`archive-${jobId}`)
+          next.delete(`archived-${jobId}`)
+          return next
+        })
+      }, 350)
+
+      showToast({ variant: 'accepted', message: 'Job archived' })
+    } catch {
+      showToast({ variant: 'error', message: 'Failed to archive. Try again.' })
+      setCompanyJobActionsInFlight(prev => {
+        const next = new Set(prev)
+        next.delete(`archive-${jobId}`)
+        return next
+      })
+    }
+  }
+
+  async function analyseJobById(jobId) {
+    if (locked) { openModal(); return }
+    setCompanyJobActionsInFlight(prev => new Set(prev).add(`analyse-${jobId}`))
+
+    // Optimistic: remove job from company view immediately
+    setSelectedCompany(prev => {
+      if (!prev) return prev
+      const remaining = prev.jobs.filter(j => j.id !== jobId)
+      if (remaining.length === 0) {
+        setView('companies')
+        return null
+      }
+      return { ...prev, jobs: remaining }
+    })
+    setScreenedCompanies(prev => {
+      if (!prev) return prev
+      return prev.map(c => {
+        if (!c.jobs?.some(j => j.id === jobId)) return c
+        const remaining = c.jobs.filter(j => j.id !== jobId)
+        return { ...c, jobs: remaining, count: remaining.length }
+      }).filter(c => c.count > 0)
+    })
+    setCounts(prev => ({
+      ...prev,
+      screened: Math.max(0, prev.screened - 1),
+      analysed: prev.analysed + 1,
+    }))
+    // Also update flat screened cache
+    setBucketCache(prev => ({
+      ...prev,
+      screened: prev.screened ? prev.screened.filter(j => j.id !== jobId) : prev.screened,
+      analysed: prev.analysed
+        ? [{ id: jobId, analysis: { status: 'summarising' } }, ...prev.analysed]
+        : prev.analysed,
+    }))
+
+    try {
+      const res = await apiFetch('/jobs/full-analysis', {
+        method: 'POST',
+        body: JSON.stringify({ ids: [jobId] }),
+      })
+      if (res.status === 401) { handleUnauth(); openModal(); return }
+
+      const data = await res.json()
+
+      if (data.rejected && data.rejected.length > 0) {
+        const reason = data.rejected[0].reason
+        showToast({ variant: 'mixed', accepted: 0, rejected: [{ id: jobId, reason }] })
+        // Revert optimistic update
+        setScreenedCompanies(null)
+        setBucketCache(prev => ({ ...prev, screened: null, analysed: null }))
+        setCounts(prev => ({
+          ...prev,
+          screened: prev.screened + 1,
+          analysed: Math.max(0, prev.analysed - 1),
+        }))
+      }
+    } catch {
+      showToast({ variant: 'error', message: 'Failed to start analysis. Try again.' })
+      setScreenedCompanies(null)
+      setBucketCache(prev => ({ ...prev, screened: null, analysed: null }))
+    } finally {
+      setCompanyJobActionsInFlight(prev => {
+        const next = new Set(prev)
+        next.delete(`analyse-${jobId}`)
+        return next
+      })
     }
   }
 
@@ -1613,7 +1766,7 @@ export default function Dashboard() {
                   <button
                     type="button"
                     className={`db-bucket-tab${activeBucket === 'screened' ? ' db-bucket-tab--active' : ''}`}
-                    onClick={() => setActiveBucket('screened')}
+                    onClick={() => { setActiveBucket('screened'); setView('companies') }}
                   >
                     Screened
                     <span className="db-bucket-tab__count">{counts.screened}</span>
@@ -1888,6 +2041,249 @@ export default function Dashboard() {
                   )}
                 </tbody>
               </table>
+            </div>
+          </>
+        )}
+
+        {/* ── COMPANIES VIEW ────────────────────────────── */}
+        {view === 'companies' && (
+          <>
+            <nav className="db-breadcrumb" aria-label="Breadcrumb">
+              <Link to="/projects" className="db-breadcrumb__link">Projects</Link>
+              <span className="db-breadcrumb__sep">/</span>
+              <Link to="/projects/job-hunt" className="db-breadcrumb__link">Job hunt</Link>
+              <span className="db-breadcrumb__sep">/</span>
+              <span className="db-breadcrumb__item">Dashboard</span>
+            </nav>
+
+            <div className="db-toolbar">
+              <div className="db-toolbar__left">
+                <div className="db-bucket-tabs">
+                  <button
+                    type="button"
+                    className="db-bucket-tab db-bucket-tab--active"
+                    onClick={() => { setActiveBucket('screened'); setView('companies') }}
+                  >
+                    Screened
+                    <span className="db-bucket-tab__count">{counts.screened}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="db-bucket-tab"
+                    onClick={() => { setActiveBucket('analysed'); setView('list') }}
+                  >
+                    Analysed
+                    <span className="db-bucket-tab__count">{counts.analysed}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="db-bucket-tab"
+                    onClick={() => { setActiveBucket('applied'); setView('list') }}
+                  >
+                    Applied
+                    <span className="db-bucket-tab__count">{counts.applied}</span>
+                  </button>
+
+                  <span className="db-bucket-tabs__separator" aria-hidden="true" />
+
+                  <button
+                    type="button"
+                    className="db-bucket-tab"
+                    onClick={() => { setActiveBucket('archive'); setView('list') }}
+                  >
+                    Archive
+                    <span className="db-bucket-tab__count">{counts.archive}</span>
+                  </button>
+                </div>
+              </div>
+              <div className="db-toolbar__right">
+                <button
+                  className="db-btn db-btn--secondary"
+                  onClick={() => setScreenedCompanies(null)}
+                  disabled={loading}
+                >
+                  {loading ? '…' : 'Refresh'}
+                </button>
+                <button
+                  className="db-btn db-btn--accent"
+                  onClick={() => { setView('search'); setScrapeSuccess(false) }}
+                  type="button"
+                >
+                  New search
+                </button>
+              </div>
+            </div>
+
+            {loading && <p className="db-loading">Loading…</p>}
+
+            {!loading && screenedCompanies !== null && screenedCompanies.length === 0 && (
+              <p className="db-empty">No screened jobs found.</p>
+            )}
+
+            {!loading && screenedCompanies !== null && screenedCompanies.length > 0 && (
+              <div className="db-company-list">
+                {screenedCompanies.map(company => (
+                  <button
+                    key={company.company_id ?? '__none__'}
+                    type="button"
+                    className="db-company-row"
+                    onClick={() => { setSelectedCompany(company); setView('company') }}
+                  >
+                    <span className="db-company-row__name">
+                      {company.company_id === '__none__' || company.company_id == null
+                        ? 'Unknown company'
+                        : company.canonical_name}
+                    </span>
+                    <span className="db-company-row__meta">
+                      <span className="db-company-row__count">{company.count} {company.count === 1 ? 'role' : 'roles'}</span>
+                      <span className="db-company-row__score-wrap">
+                        <ScoreBadge score={company.best_match_score ?? null} onLockClick={openModal} />
+                        <span className="db-company-row__score-label">best match</span>
+                      </span>
+                      {company.median_recommendation_score != null && (
+                        <span className="db-company-row__rec">
+                          rec {company.median_recommendation_score}
+                        </span>
+                      )}
+                    </span>
+                    <span className="db-company-row__chevron" aria-hidden="true">›</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ── COMPANY PAGE ──────────────────────────────── */}
+        {view === 'company' && selectedCompany && (
+          <>
+            <nav className="db-breadcrumb" aria-label="Breadcrumb">
+              <Link to="/projects" className="db-breadcrumb__link">Projects</Link>
+              <span className="db-breadcrumb__sep">/</span>
+              <Link to="/projects/job-hunt" className="db-breadcrumb__link">Job hunt</Link>
+              <span className="db-breadcrumb__sep">/</span>
+              <Link
+                to="/projects/job-hunt/dashboard"
+                className="db-breadcrumb__link"
+                onClick={e => { e.preventDefault(); backToCompanies() }}
+              >
+                Dashboard
+              </Link>
+              <span className="db-breadcrumb__sep">/</span>
+              <span className="db-breadcrumb__item">
+                {selectedCompany.company_id === '__none__' || selectedCompany.company_id == null
+                  ? 'Unknown company'
+                  : selectedCompany.canonical_name}
+              </span>
+            </nav>
+            <button className="db-back" type="button" onClick={backToCompanies}>← Back</button>
+
+            {/* Company header */}
+            <div className="db-card db-company-header">
+              <h1 className="db-company-header__name">
+                {selectedCompany.company_id === '__none__' || selectedCompany.company_id == null
+                  ? 'Unknown company'
+                  : selectedCompany.canonical_name}
+              </h1>
+              <p className="db-company-header__recap">
+                {selectedCompany.count} {selectedCompany.count === 1 ? 'role' : 'roles'}
+                {' · '}best match {selectedCompany.best_match_score ?? '—'}
+                {selectedCompany.median_recommendation_score != null && (
+                  <> · median rec {selectedCompany.median_recommendation_score}</>
+                )}
+              </p>
+              {selectedCompany.candidate_fit_score != null && (
+                <p className="db-company-header__fit">
+                  <span className="db-section-label db-section-label--inline">Candidate fit</span>
+                  {' '}
+                  <ScoreBadge score={selectedCompany.candidate_fit_score} onLockClick={openModal} />
+                </p>
+              )}
+              {selectedCompany.candidate_fit_reasoning && (
+                <p className="db-company-header__reasoning">{selectedCompany.candidate_fit_reasoning}</p>
+              )}
+              {selectedCompany.summary && (
+                <p className="db-company-header__reasoning">{selectedCompany.summary}</p>
+              )}
+            </div>
+
+            {/* Job blocks */}
+            <div className="db-company-jobs">
+              {selectedCompany.jobs.map(job => {
+                const archiveKey = `archive-${job.id}`
+                const analyseKey = `analyse-${job.id}`
+                const archivedKey = `archived-${job.id}`
+                const archiving = companyJobActionsInFlight.has(archiveKey)
+                const analysing = companyJobActionsInFlight.has(analyseKey)
+                const archiveAnimating = companyJobActionsInFlight.has(archivedKey)
+                return (
+                  <div
+                    key={job.id}
+                    className={`db-job-block${archiveAnimating ? ' db-job-block--archiving' : ''}`}
+                  >
+                    <div className="db-job-block__header">
+                      <span className="db-job-block__title">{job.positionName}</span>
+                      <span className="db-job-block__age db-table__muted">
+                        {job.postingDate
+                          ? `posted ${relativeTime(job.postingDate)}`
+                          : `first seen ${relativeTime(job.scrapedAt)}`}
+                      </span>
+                    </div>
+
+                    {job.screening?.role_summary && (
+                      <p className="db-job-block__summary">{job.screening.role_summary}</p>
+                    )}
+
+                    <div className="db-job-block__scores">
+                      <div className="db-job-block__score-col">
+                        <div className="db-job-block__score-header">
+                          <ScoreBadge
+                            score={job.screening?.match_score ?? null}
+                            onLockClick={openModal}
+                          />
+                          <span className="db-screening-sublabel">Match</span>
+                        </div>
+                        {job.screening?.match_reasoning && (
+                          <p className="db-job-block__reasoning">{job.screening.match_reasoning}</p>
+                        )}
+                      </div>
+                      <div className="db-job-block__score-col">
+                        <div className="db-job-block__score-header">
+                          <ScoreBadge
+                            score={job.screening?.recommendation_score ?? null}
+                            onLockClick={openModal}
+                          />
+                          <span className="db-screening-sublabel">Recommendation</span>
+                        </div>
+                        {job.screening?.recommendation_reasoning && (
+                          <p className="db-job-block__reasoning">{job.screening.recommendation_reasoning}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="db-job-block__actions">
+                      <button
+                        type="button"
+                        className={locked ? 'db-btn db-btn--locked' : 'db-btn db-btn--accent'}
+                        onClick={locked ? undefined : () => analyseJobById(job.id)}
+                        disabled={analysing || archiving}
+                      >
+                        {analysing && <span className="db-spinner" aria-hidden="true" />}
+                        Analyse
+                      </button>
+                      <button
+                        type="button"
+                        className={locked ? 'db-btn db-btn--locked' : 'db-btn db-btn--secondary'}
+                        onClick={locked ? undefined : () => archiveJobById(job.id)}
+                        disabled={archiving || analysing}
+                      >
+                        {archiving && <span className="db-spinner" aria-hidden="true" />}
+                        Archive
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </>
         )}
