@@ -512,6 +512,7 @@ export default function Dashboard() {
 
   // Phase 12 state
   const [retryInFlight, setRetryInFlight] = useState(false)
+  const [copyPromptInFlight, setCopyPromptInFlight] = useState(false)
   const [retryAllInFlight, setRetryAllInFlight] = useState(false)
   const [rowActionsInFlight, setRowActionsInFlight] = useState(new Set())
 
@@ -1115,6 +1116,25 @@ export default function Dashboard() {
       body: JSON.stringify({ mode: 'generate' }),
     })
     if (res.status === 401) { handleUnauth(); openModal(); return }
+  }
+
+  async function copyContextPrompt() {
+    setCopyPromptInFlight(true)
+    try {
+      const res = await apiFetch(`/jobs/${selectedJobId}/context-prompt`)
+      if (res.status === 401) { handleUnauth(); return }
+      if (!res.ok) {
+        showToast({ variant: 'error', message: 'Failed to build context prompt. Try again.' })
+        return
+      }
+      const data = await res.json()
+      await navigator.clipboard.writeText(data.prompt)
+      showToast({ variant: 'accepted', message: 'Context prompt copied to clipboard' })
+    } catch (e) {
+      showToast({ variant: 'error', message: 'Failed to copy context prompt. Try again.' })
+    } finally {
+      setCopyPromptInFlight(false)
+    }
   }
 
   async function runCoverLetterRevise(feedback) {
@@ -2473,6 +2493,16 @@ export default function Dashboard() {
                       >
                         {!locked && jobDetail.cover_letter?.status === 'generating' && <span className="db-spinner" aria-hidden="true" />}
                         Cover letter
+                      </button>
+                      <button
+                        className={locked ? 'db-btn db-btn--locked' : 'db-btn db-btn--secondary'}
+                        onClick={locked ? undefined : copyContextPrompt}
+                        disabled={locked || copyPromptInFlight || analysisIncomplete}
+                        title={!locked && analysisIncomplete ? 'Run full analysis first' : undefined}
+                        type="button"
+                      >
+                        {!locked && copyPromptInFlight && <span className="db-spinner" aria-hidden="true" />}
+                        Copy context prompt
                       </button>
                       <button
                         className={locked ? 'db-btn db-btn--locked' : 'db-btn db-btn--secondary'}
