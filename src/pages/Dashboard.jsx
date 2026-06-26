@@ -517,6 +517,7 @@ export default function Dashboard() {
 
   // Company grouped view state
   const [screenedCompanies, setScreenedCompanies] = useState(null)
+  const [includeBelowThreshold, setIncludeBelowThreshold] = useState(false)
   const [selectedCompany, setSelectedCompany] = useState(null)
   const [companyJobActionsInFlight, setCompanyJobActionsInFlight] = useState(new Set())
 
@@ -746,7 +747,8 @@ export default function Dashboard() {
   const loadScreenedGrouped = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await apiFetch('/jobs?bucket=screened&group_by_company=true')
+      const params = '/jobs?bucket=screened&group_by_company=true' + (includeBelowThreshold ? '&include_below_threshold=true' : '')
+      const res = await apiFetch(params)
       if (res.status === 401) { handleUnauth(); return }
       const data = await res.json()
       setScreenedCompanies(data.companies || [])
@@ -754,7 +756,7 @@ export default function Dashboard() {
     } finally {
       setLoading(false)
     }
-  }, [handleUnauth])
+  }, [handleUnauth, includeBelowThreshold])
 
   useEffect(() => {
     if (view === 'companies' && screenedCompanies === null) {
@@ -2113,6 +2115,18 @@ export default function Dashboard() {
                 </button>
               </div>
             </div>
+
+            <label className="db-threshold-toggle">
+              <input
+                type="checkbox"
+                checked={includeBelowThreshold}
+                onChange={e => {
+                  setIncludeBelowThreshold(e.target.checked)
+                  setScreenedCompanies(null)
+                }}
+              />
+              Show jobs below threshold
+            </label>
 
             {loading && <p className="db-loading">Loading…</p>}
 

@@ -1731,6 +1731,22 @@
 
 /* ─── Company list view ───────────────────────── */
 
+.db-threshold-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.db-threshold-toggle input[type="checkbox"] {
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
 .db-company-list {
   display: flex;
   flex-direction: column;
